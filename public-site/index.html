@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Alla — AI real estate &amp; investment advisor for Spain</title>
+<meta name="description" content="Alla — AI real estate and investment advisor for Spain. Ask about a property, plot, taxes, or ROI." />
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#e10886" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="brand">
+      <div class="logo-badge" aria-hidden="true">
+        <span class="logo-line-1">AllA</span>
+        <span class="logo-line-2">agent</span>
+      </div>
+      <p class="tagline">Agent AllA — Your Real Estate Agent in&nbsp;Spain</p>
+      <div class="chip-row">
+        <span class="chip">Legal review</span>
+        <span class="chip">Taxes</span>
+        <span class="chip">Zoning &amp; planning</span>
+        <span class="chip">ROI / buy-build-sell</span>
+      </div>
+    </header>
+
+    <section class="why">
+      <h2>Why Alla</h2>
+      <div class="why-grid">
+        <div class="why-item">
+          <h3>An investment analyst, not a portal</h3>
+          <p>For every property, Alla surfaces the full cost of entry, realistic exit value, taxes, and risk — the way a professional investment advisor would, not a listing description.</p>
+        </div>
+        <div class="why-item">
+          <h3>Independent of any one agency's inventory</h3>
+          <p>Buyer-side recommendations are ranked against the client's needs and the wider market — never limited to, or biased toward, one agency's own portfolio.</p>
+        </div>
+        <div class="why-item">
+          <h3>One agent, every side of the deal</h3>
+          <p>The same intelligence works as a personal agent for a buyer, a copilot for a human agent, an extra employee for an agency, and a live assistant on an agency's own website.</p>
+        </div>
+        <div class="why-item">
+          <h3>Never off duty</h3>
+          <p>On an agency's website, Alla keeps qualifying and helping visitors around the clock — including the hours when no human agent is at a desk.</p>
+        </div>
+        <div class="why-item">
+          <h3>National reach, island-level depth</h3>
+          <p>Full coverage across Spain, with the deepest specialization in the Balearic Islands — Menorca, Ibiza and Mallorca each treated as their own market, not lumped together.</p>
+        </div>
+      </div>
+    </section>
+
+    <main class="chat" id="chat">
+      <div class="chat-scroll" id="chatScroll">
+        <div class="msg alla">
+          Hello! I'm Alla, an AI advisor for real estate and investment in Spain.
+          Tell me about a property, plot, or investment question — I'll break
+          down costs, taxes, and realistic returns.
+        </div>
+      </div>
+      <form class="composer" id="composer">
+        <input
+          id="composerInput"
+          type="text"
+          autocomplete="off"
+          placeholder="Ask about a property, plot, taxes, ROI…"
+        />
+        <button type="button" id="micButton" class="mic-btn" title="Voice input" aria-label="Voice input">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+        <button type="submit" title="Send" aria-label="Send">Send</button>
+      </form>
+    </main>
+
+    <footer class="footer">
+      <span>ROILITY, S.L.</span>
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
