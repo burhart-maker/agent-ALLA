@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Alla — AI real estate &amp; investment advisor for Spain</title>
+<meta name="description" content="Alla — AI real estate and investment advisor for Spain. Ask about a property, plot, taxes, or ROI." />
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#e10886" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="brand">
+      <div class="logo-badge" aria-hidden="true">
+        <span class="logo-line-1">AllA</span>
+        <span class="logo-line-2">agent</span>
+      </div>
+      <p class="tagline">AI real estate &amp; investment advisor for&nbsp;Spain</p>
+      <div class="chip-row">
+        <span class="chip">Legal review</span>
+        <span class="chip">Taxes</span>
+        <span class="chip">Zoning &amp; planning</span>
+        <span class="chip">ROI / buy-build-sell</span>
+      </div>
+    </header>
+
+    <main class="chat" id="chat">
+      <div class="chat-scroll" id="chatScroll">
+        <div class="msg alla">
+          Hello! I'm Alla, an AI advisor for real estate and investment in Spain.
+          Tell me about a property, plot, or investment question — I'll break
+          down costs, taxes, and realistic returns.
+        </div>
+      </div>
+      <form class="composer" id="composer">
+        <input
+          id="composerInput"
+          type="text"
+          autocomplete="off"
+          placeholder="Ask about a property, plot, taxes, ROI…"
+        />
+        <button type="submit" title="Send" aria-label="Send">Send</button>
+      </form>
+    </main>
+
+    <footer class="footer">
+      <span>ROILITY, S.L.</span>
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
