@@ -6,7 +6,7 @@ The public website agentalla.com is served by Cloudflare Pages project `agentall
 
 Render service `alla-backend` runs this repository's backend from main. Its root directory is backend and automatic deployment is enabled. Do not change DNS to Render to resolve its pending custom domain verification.
 
-## Release gate
+## Release gate (historical discovery; v38 source now received)
 
 Do not publish this repository's public-site directory to the production Pages project until the current deployed application's complete source is reconciled. HTML and other public assets alone do not recover Pages Functions. A downloaded Wrangler configuration is not a source backup.
 
@@ -34,3 +34,15 @@ Cloudflare access is intentionally limited to account/user reads and Pages write
 ## Development routine
 
 Work on a branch, review the diff, run relevant checks, and prepare a preview before releasing. Production changes should come from a known commit and a reproducible build. Until the release gate above is satisfied, main and production remain unchanged.
+
+## Reproducible v38 release
+
+The owner supplied agentalla-site-v38.zip. Its 15 files are preserved byte-for-byte in site/, including _worker.js. This Worker handles /api/chat directly through Anthropic; it does not call Render. The legacy public-site/ and backend/ folders remain for reference and are not used by this Pages build.
+
+Use Node 22+ and pnpm 11.19.0. Run `pnpm install --frozen-lockfile --ignore-scripts`, `pnpm test`, and `pnpm build`. The build copies site/ to dist/ and adds release.json with the commit and asset hashes. Never expose _worker.js as an ordinary static download; Wrangler deploys it as the Pages Worker.
+
+Commit first, then `pnpm preview:deploy`. This publishes only to setup-preview. Preview has no production AI secret by default; test routing and validation without copying production secrets. A real AI response requires separately configured preview credentials.
+
+`pnpm production:deploy` requires a clean checkout of main matching origin/main. It runs tests and builds before publishing. Before executing it, verify the preview and preserve the previous production deployment ID. No production deployment has been performed as part of access setup.
+
+Automatic GitHub Actions deployment is not yet configured. Current publication is reproducible and executable locally without browser tabs. CI authorization/secrets can be added separately without replacing the current Pages project.

@@ -1,0 +1,125 @@
+/* Shared minimal styling for Agent Alla legal pages (privacy / terms /
+   subscription-terms). Deliberately lightweight and independent of the
+   main index.html bundle (no globe, no gradient, no chat) — just brand
+   tokens + readable prose, light/dark aware via the same three selectors
+   index.html already uses (default :root, prefers-color-scheme, manual
+   data-theme override). */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Manrope:wght@400;500;600;700&display=swap');
+
+:root {
+  --ink: #142129;
+  --ink-soft: #3b4a52;
+  --paper: #f1eee5;
+  --paper-raised: #fbfaf5;
+  --line: #d9d4c5;
+  --accent: #e10886;
+  --accent-strong: #b8066b;
+  --accent-soft: #fbe3ef;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #eef0ee;
+    --ink-soft: #b7c2c1;
+    --paper: #0f1a1c;
+    --paper-raised: #172426;
+    --line: #2a3739;
+    --accent: #ff5fac;
+    --accent-strong: #ff8ac2;
+    --accent-soft: #3a1a2c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #eef0ee;
+  --ink-soft: #b7c2c1;
+  --paper: #0f1a1c;
+  --paper-raised: #172426;
+  --line: #2a3739;
+  --accent: #ff5fac;
+  --accent-strong: #ff8ac2;
+  --accent-soft: #3a1a2c;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Manrope', system-ui, sans-serif;
+  line-height: 1.6;
+}
+.legal-topbar {
+  border-bottom: 1px solid var(--line);
+  padding: 18px 24px;
+}
+.legal-topbar a {
+  color: var(--ink);
+  text-decoration: none;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+.legal-topbar a:hover { color: var(--accent); }
+main.legal {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+.legal h1 {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: clamp(28px, 4vw, 38px);
+  margin: 0 0 6px;
+}
+.legal .updated {
+  color: var(--ink-soft);
+  font-size: 14px;
+  margin: 0 0 32px;
+}
+.legal .notice {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-strong);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 14px;
+  color: var(--ink);
+  margin: 0 0 36px;
+}
+.legal h2 {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 20px;
+  margin: 40px 0 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.legal h2:first-of-type { border-top: none; padding-top: 0; }
+.legal h3 {
+  font-size: 15.5px;
+  margin: 20px 0 8px;
+}
+.legal p, .legal li { color: var(--ink-soft); font-size: 15px; }
+.legal strong { color: var(--ink); }
+.legal ul, .legal ol { padding-left: 22px; }
+.legal li { margin: 6px 0; }
+.legal a { color: var(--accent-strong); }
+.legal table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 14px; }
+.legal th, .legal td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; color: var(--ink-soft); }
+.legal th { color: var(--ink); font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 600; }
+.legal .contact-block {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 20px;
+  font-size: 14px;
+}
+.legal-foot {
+  border-top: 1px solid var(--line);
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.legal-foot a { color: var(--ink-soft); }

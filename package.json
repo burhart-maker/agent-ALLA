@@ -1,0 +1,17 @@
+{
+  "name": "agentalla-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "preview:deploy": "node scripts/deploy.mjs preview",
+    "production:deploy": "node scripts/deploy.mjs production"
+  },
+  "devDependencies": {
+    "wrangler": "4.131.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
