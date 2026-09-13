@@ -1,0 +1,50 @@
+{
+  "id": "/",
+  "name": "Agent ALLA — Real Estate & Investment Advisor",
+  "short_name": "Agent ALLA",
+  "description": "Your AI real estate agent for life. Global intelligence, local expertise — property, tax, planning and investment analysis for Spain.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#b8066b",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/assets/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/pwa/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Ask Alla",
+      "short_name": "Ask",
+      "description": "Open the chat and ask about a property, plot, taxes or ROI",
+      "url": "/"
+    },
+    {
+      "name": "FAQ",
+      "short_name": "FAQ",
+      "description": "What Alla can and cannot do",
+      "url": "/faq.html"
+    }
+  ]
+}

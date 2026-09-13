@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Get Agent Alla — app &amp; browser extension</title>
+<meta name="description" content="Install Agent Alla as an app on your phone or computer, and add the browser extension to have her on any property listing you open.">
+<link rel="stylesheet" href="legal-shared.css">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#b8066b" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1a1c" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="/assets/pwa/apple-touch-icon.png">
+<style>
+  .get-grid { display: grid; gap: 18px; margin: 0 0 8px; }
+  @media (min-width: 720px) { .get-grid { grid-template-columns: 1fr 1fr; } }
+
+  .get-card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--paper-raised);
+    padding: 22px 22px 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  .get-card h2 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-size: 18px;
+    margin: 0 0 6px;
+  }
+  .get-card .lede { color: var(--ink-soft); font-size: 14.5px; margin: 0 0 16px; }
+
+  .legal h1 .brand { color: var(--accent-strong); }
+
+  .get-icon-link {
+    display: inline-block;
+    margin: 0 0 14px;
+    line-height: 0;
+    border-radius: 50%;
+    transition: transform 0.15s ease;
+  }
+  .get-icon-link:hover { transform: scale(1.06); }
+  .get-icon-link:focus-visible { outline: 2px solid var(--accent-soft-border); outline-offset: 3px; }
+  .get-icon {
+    width: 56px; height: 56px;
+    display: block;
+  }
+
+  .legal .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: 100px;
+    border: 1px solid transparent;
+    background: var(--accent-strong);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    font-size: 15px;
+    text-decoration: none;
+    cursor: pointer;
+    align-self: flex-start;
+  }
+  .legal .btn:hover { background: var(--accent); color: #fff; }
+  .legal .btn.secondary {
+    background: transparent;
+    color: var(--accent-strong);
+    border-color: var(--accent-soft-border);
+  }
+  .legal .btn.secondary:hover { background: var(--accent-soft); color: var(--accent-strong); }
+  .legal .btn[hidden] { display: none; }
+
+  .filesize { font-size: 12.5px; color: var(--ink-soft); margin: 10px 0 0; }
+
+  .steps { margin: 16px 0 0; padding: 0 0 0 20px; font-size: 14px; color: var(--ink-soft); }
+  .steps li { margin: 0 0 7px; }
+  .steps b, .steps strong { color: var(--ink); font-weight: 600; }
+
+  .tabs-label { font-size: 12.5px; color: var(--ink-soft); margin: 18px 0 6px; }
+
+  .tag {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 6px;
+    padding: 2px 9px;
+    border-radius: 100px;
+    border: 1px solid var(--accent-soft-border);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .heads-up {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    margin: 0 0 16px;
+    padding: 11px 13px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .heads-up b { color: var(--ink); font-weight: 600; }
+
+  .manual { margin: 14px 0 0; }
+  .manual summary {
+    cursor: pointer;
+    font-size: 13.5px;
+    color: var(--accent-strong);
+    width: fit-content;
+  }
+  .manual[open] summary { margin-bottom: 4px; }
+
+  .platform-tabs { display: flex; gap: 6px; margin: 4px 0 0; flex-wrap: wrap; }
+  .platform-tabs button {
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 13px;
+    border-radius: 100px;
+    border: 1px solid var(--accent-soft-border);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .platform-tabs button[aria-selected="true"] {
+    background: var(--accent-soft);
+    border-color: var(--accent-soft-border);
+    font-weight: 600;
+  }
+  .platform-panel[hidden] { display: none; }
+
+  .about { margin: 0 0 26px; }
+  .about p { font-size: 15px; line-height: 1.62; margin: 0 0 12px; color: var(--ink-soft); }
+  .about strong { color: var(--ink); }
+
+  .facts { margin: 30px 0 0; }
+  .facts h2 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-size: 15.5px;
+    margin: 22px 0 6px;
+  }
+  .facts h2:first-of-type { margin-top: 0; }
+  .facts p { font-size: 14.5px; line-height: 1.6; margin: 0 0 10px; color: var(--ink-soft); }
+  .facts b { color: var(--ink); font-weight: 600; }
+  .facts .caveat {
+    margin: 18px 0 0;
+    padding: 14px 16px;
+    border-left: 3px solid var(--accent-soft-border);
+    background: var(--paper-raised);
+    border-radius: 0 10px 10px 0;
+    font-size: 14px;
+  }
+
+  .soon {
+    margin: 26px 0 0;
+    padding: 16px 18px;
+    border: 1px dashed var(--accent-soft-border);
+    border-radius: 12px;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .soon strong { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="legal-topbar"><a href="index.html">← Agent Alla</a></div>
+
+<main class="legal">
+  <h1>Get <span class="brand">Agent AllA</span></h1>
+  <p class="updated">Two ways to keep her one tap away.</p>
+
+  <div class="about">
+    <p>
+      <strong>Alla is an AI real estate and investment advisor for Spain.</strong>
+      She works like an investment analyst rather than a listings search: for
+      any property, plot or deal, she puts together the full cost of entry —
+      price, taxes, notary, registration, reform — a realistic exit value, and
+      the risks that move either number.
+    </p>
+    <p>
+      She reads planning and cadastral data and looks the plot up in Spain's
+      official Catastro; compares buy-to-flip against buy-to-let against staged
+      strategies on the same asset; explains which taxes apply to your buyer
+      profile and region; and writes a full feasibility memorandum when you ask
+      for one. Her deepest expertise is the Balearic Islands, and national
+      frameworks apply across the rest of Spain.
+    </p>
+    <p>
+      All of it already works in the browser at
+      <a href="index.html">agentalla.com</a> — nothing to install. Installing
+      simply puts her where you work.
+    </p>
+  </div>
+
+  <div class="get-grid">
+
+    <section class="get-card">
+      <a class="get-icon-link" href="index.html" aria-label="Open Agent AllA">
+        <img class="get-icon" src="assets/pwa/icon-192.png" alt="" width="56" height="56">
+      </a>
+      <h2>The app</h2>
+      <p class="lede">
+        Installs to your home screen or dock with its own icon, opens
+        full-screen without a browser bar, and updates itself. Works on
+        iPhone, Android, Mac and Windows.
+      </p>
+
+      <button class="btn" id="install-btn" hidden>Install the app</button>
+      <a class="btn" id="open-btn" href="index.html">Open Agent Alla</a>
+
+      <!-- download.js opens the steps for the visitor's own device on load.
+           The tab row is only for the rarer case of reading this page on one
+           device while setting up another, so it is introduced as that
+           instead of making everyone choose before they can read anything. -->
+      <p class="tabs-label">Setting it up on a different device?</p>
+      <div class="platform-tabs" id="tabs" role="tablist" aria-label="Choose your device">
+        <button type="button" role="tab" data-p="ios" aria-selected="false">iPhone / iPad</button>
+        <button type="button" role="tab" data-p="android" aria-selected="false">Android</button>
+        <button type="button" role="tab" data-p="desktop" aria-selected="false">Mac / Windows</button>
+      </div>
+
+      <div class="platform-panel" data-p="ios" hidden>
+        <ol class="steps">
+          <li>Open <b>agentalla.com</b> in <b>Safari</b> (this only works in Safari on iOS).</li>
+          <li>Tap the <b>Share</b> button — the square with an arrow.</li>
+          <li>Choose <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+        </ol>
+      </div>
+      <div class="platform-panel" data-p="android" hidden>
+        <ol class="steps">
+          <li>Open <b>agentalla.com</b> in <b>Chrome</b>.</li>
+          <li>Tap <b>Install</b> when it appears, or open the <b>⋮</b> menu.</li>
+          <li>Choose <b>Install app</b> / <b>Add to Home screen</b>.</li>
+        </ol>
+      </div>
+      <div class="platform-panel" data-p="desktop" hidden>
+        <ol class="steps">
+          <li>Open <b>agentalla.com</b> in <b>Chrome</b> or <b>Edge</b>.</li>
+          <li>Click the <b>install icon</b> at the right of the address bar.</li>
+          <li>Confirm <b>Install</b> — Alla gets her own window and dock icon.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="get-card">
+      <a class="get-icon-link" href="download/agent-alla-extension-0.3.0.zip" download aria-label="Download the extension">
+        <img class="get-icon" src="assets/pwa/icon-192.png" alt="" width="56" height="56">
+      </a>
+      <h2>The browser extension <span class="tag">for tinkerers, for now</span></h2>
+      <p class="lede">
+        Puts Alla in a side panel next to whatever you're reading — a
+        listing on idealista, a cadastral record, a contract — so you can
+        ask about the page you're on without leaving it.
+      </p>
+
+      <p class="heads-up">
+        Until the Chrome Web Store listing is approved this one installs by
+        hand, in five steps. <b>If that sounds like work, take the app
+        instead</b> — it does everything except sit on top of other websites.
+      </p>
+
+      <a class="btn secondary" href="download/agent-alla-extension-0.3.0.zip" download>Download the extension</a>
+      <p class="filesize">ZIP · 0.9 MB · Chrome, Edge, Brave, Opera · version 0.3.0</p>
+
+      <details class="manual">
+        <summary>Show the five steps</summary>
+        <ol class="steps">
+          <li><b>Unzip</b> the downloaded file.</li>
+          <li>Open <b>chrome://extensions</b> (or <b>edge://extensions</b>).</li>
+          <li>Turn on <b>Developer mode</b>, top right.</li>
+          <li>Click <b>Load unpacked</b> and pick the
+            <b>agent-alla-extension</b> folder from the unzipped file.</li>
+          <li>Pin Alla to the toolbar and click her to open the side panel.</li>
+        </ol>
+      </details>
+    </section>
+
+  </div>
+
+  <section class="facts">
+    <h2>What the extension can and can't see</h2>
+    <p>
+      The side panel talks to one address, <b>agentalla.com</b>, and nothing
+      else. There is no API key inside the extension — it stays on the server,
+      exactly as it does for the website. What you type into the panel is sent
+      there to be answered; that is the only thing that leaves your browser.
+    </p>
+    <p>
+      The floating orb is allowed to appear on any page so you can open Alla
+      wherever you are, but it does not read the page. It draws the button and
+      remembers where you dragged it — nothing about the pages you visit is
+      collected or sent anywhere.
+    </p>
+    <p>
+      Your conversation is kept in your own browser's storage, not on our
+      servers, and removing the extension removes it.
+    </p>
+
+    <h2>Requirements</h2>
+    <p>
+      Chrome, Edge, Brave or Opera, version 114 or newer — the side panel needs
+      it. Safari and Firefox use a different extension API and are not
+      supported yet. The app has no such limit: it installs from any modern
+      browser on iPhone, Android, Mac and Windows.
+    </p>
+
+    <h2>This release</h2>
+    <p>
+      Extension <b>0.3.0</b> — live chat in the panel, conversation kept between
+      sessions, light/dark to match your system, and a permission set cut back
+      to the two things it actually uses. It no longer asks for access to every
+      site you visit.
+    </p>
+
+    <h2>Who makes it</h2>
+    <p>
+      Agent Alla is built and operated by <b>ROILITY, S.L.</b> (NIF B21964564),
+      Eivissa, Illes Balears, Spain. Questions and problems:
+      <a href="mailto:hola@agentalla.com">hola@agentalla.com</a>. See also the
+      <a href="privacy.html">Privacy Policy</a> and
+      <a href="terms.html">Terms of Service</a>.
+    </p>
+
+    <p class="caveat">
+      Alla's figures are estimates to reason with, not binding legal, tax or
+      financial advice. She names what needs local verification instead of
+      inventing a number — treat her output as the start of due diligence, not
+      the end of it.
+    </p>
+  </section>
+
+  <div class="soon">
+    <strong>App Store and Google Play:</strong> native store versions are on
+    the way. The app above is the same Alla and needs no store — install it
+    now and it keeps itself up to date.
+  </div>
+</main>
+
+<footer class="legal-foot">
+  <p>ROILITY, S.L. · <a href="index.html">agentalla.com</a> · <a href="faq.html">FAQ</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a></p>
+</footer>
+
+<script src="download.js"></script>
+
+</body>
+</html>

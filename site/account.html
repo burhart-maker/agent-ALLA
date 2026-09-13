@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Your account — Agent Alla</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="Your Agent Alla account: plan, usage, invoices and sign-in.">
+<link rel="stylesheet" href="legal-shared.css">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#b8066b" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1a1c" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="/assets/pwa/apple-touch-icon.png">
+<style>
+  .legal h1 .brand { color: var(--accent-strong); }
+
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--paper-raised);
+    padding: 22px 22px 20px;
+    margin: 0 0 18px;
+  }
+  .card h2 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-size: 17px;
+    margin: 0 0 12px;
+  }
+
+  .rows { display: grid; gap: 10px; }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    font-size: 14.5px;
+    border-bottom: 1px dashed var(--line);
+    padding: 0 0 9px;
+  }
+  .row:last-child { border-bottom: 0; padding-bottom: 0; }
+  .row .k { color: var(--ink-soft); }
+  .row .v { font-weight: 600; text-align: right; }
+
+  .meter {
+    height: 8px;
+    border-radius: 100px;
+    background: var(--accent-soft);
+    overflow: hidden;
+    margin: 4px 0 0;
+  }
+  .meter i { display: block; height: 100%; background: var(--accent-strong); width: 0; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+
+  .legal .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 19px;
+    border-radius: 100px;
+    border: 1px solid transparent;
+    background: var(--accent-strong);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    font-size: 14.5px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .legal .btn:hover { background: var(--accent); color: #fff; }
+  .legal .btn.secondary {
+    background: transparent;
+    color: var(--accent-strong);
+    border-color: var(--line);
+  }
+  .legal .btn.secondary:hover { background: var(--accent-soft); color: var(--accent-strong); }
+  .legal .btn[disabled] { opacity: 0.55; cursor: default; }
+
+  .field { display: block; margin: 0 0 12px; }
+  .field span {
+    display: block;
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 0 0 5px;
+  }
+  .field input {
+    width: 100%;
+    font: inherit;
+    font-size: 15px;
+    padding: 11px 13px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .field input:focus {
+    outline: 2px solid var(--accent-soft);
+    border-color: var(--accent-strong);
+  }
+
+  .tabs { display: flex; gap: 6px; margin: 0 0 16px; }
+  .tabs button {
+    font: inherit;
+    font-size: 13.5px;
+    padding: 7px 15px;
+    border-radius: 100px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] {
+    background: var(--accent-soft);
+    border-color: var(--accent-soft);
+    font-weight: 600;
+  }
+
+  .linkish {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    background: none;
+    border: 0;
+    padding: 0 0 0 10px;
+    color: var(--accent-strong);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .note { font-size: 13px; color: var(--ink-soft); margin: 12px 0 0; }
+  .msg { font-size: 14px; margin: 12px 0 0; min-height: 1px; }
+  .msg.bad { color: #c62828; }
+  :root[data-theme="dark"] .msg.bad, :root:not([data-theme="light"]) .msg.bad { color: #ff8b8b; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .msg.bad { color: #c62828; } }
+  .msg.ok { color: var(--accent-strong); }
+
+  [hidden] { display: none !important; }
+
+  .plan-grid { display: grid; gap: 14px; }
+  @media (min-width: 640px) { .plan-grid { grid-template-columns: 1fr 1fr; } }
+  .plan {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 16px 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  .plan h3 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-size: 15.5px;
+    margin: 0 0 2px;
+  }
+  .plan .price { font-size: 21px; font-weight: 700; margin: 0 0 2px; }
+  .plan .price small { font-size: 13px; font-weight: 500; color: var(--ink-soft); }
+  .plan p { font-size: 13.5px; color: var(--ink-soft); margin: 6px 0 14px; }
+  .plan .btn { align-self: flex-start; margin-top: auto; }
+  .plan[data-current] { border-color: var(--accent-strong); }
+</style>
+</head>
+<body>
+
+<div class="legal-topbar"><a href="index.html">← Agent Alla</a></div>
+
+<main class="legal">
+  <h1>Your <span class="brand">account</span></h1>
+  <p class="updated" id="subtitle">Checking your session…</p>
+
+  <!-- ============ signed out ============ -->
+  <section class="card" id="auth" hidden>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-login" aria-selected="true">Sign in</button>
+      <button type="button" role="tab" id="tab-signup" aria-selected="false">Create an account</button>
+    </div>
+
+    <form id="auth-form" autocomplete="on">
+      <label class="field" id="name-field" hidden>
+        <span>Your name <em style="font-style:normal;opacity:.7">— shown in the footer and in your account</em></span>
+        <input type="text" id="name" name="name" autocomplete="name" maxlength="60" placeholder="Evgeny Burkhart">
+      </label>
+      <label class="field">
+        <span>Email</span>
+        <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@company.com">
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" id="password" name="password" required minlength="8" autocomplete="current-password" placeholder="At least 8 characters">
+      </label>
+      <button class="btn" type="submit" id="auth-submit">Sign in</button>
+      <p class="msg" id="auth-msg"></p>
+    </form>
+
+    <p class="note">
+      An account is what carries your plan and your usage. Alla answers
+      without one too — there is a small free allowance every day for
+      visitors who are not signed in.
+    </p>
+  </section>
+
+  <!-- ============ signed in ============ -->
+  <section class="card" id="overview" hidden>
+    <h2>Plan</h2>
+    <div class="rows">
+      <div class="row">
+        <span class="k">Name</span>
+        <span class="v">
+          <span id="v-name">—</span>
+          <button type="button" id="name-edit" class="linkish">edit</button>
+        </span>
+      </div>
+      <div class="row" id="name-editor" hidden>
+        <span class="k" style="flex:1">
+          <input type="text" id="name-input" maxlength="60" placeholder="How you'd like to be called"
+                 style="width:100%;font:inherit;font-size:15px;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink)">
+        </span>
+        <span class="v" style="display:flex;gap:8px">
+          <button type="button" class="btn" id="name-save" style="padding:9px 16px;font-size:14px">Save</button>
+          <button type="button" class="btn secondary" id="name-cancel" style="padding:9px 16px;font-size:14px">Cancel</button>
+        </span>
+      </div>
+      <div class="row"><span class="k">Signed in as</span><span class="v" id="v-email">—</span></div>
+      <div class="row"><span class="k">Plan</span><span class="v" id="v-plan">—</span></div>
+      <div class="row"><span class="k">Status</span><span class="v" id="v-status">—</span></div>
+      <div class="row" id="row-renews" hidden><span class="k">Renews</span><span class="v" id="v-renews">—</span></div>
+      <div class="row" id="row-autopay" hidden><span class="k">Beyond the allowance</span><span class="v" id="v-autopay">—</span></div>
+    </div>
+
+    <div id="usage-wrap" hidden>
+      <h2 style="margin-top:20px">This period</h2>
+      <div class="rows">
+        <div class="row"><span class="k" id="k-usage">Included usage</span><span class="v" id="v-usage">—</span></div>
+      </div>
+      <div class="meter"><i id="meter-bar"></i></div>
+      <p class="note" id="usage-note"></p>
+    </div>
+
+    <div class="actions">
+      <button class="btn secondary" type="button" id="portal-btn">Invoices &amp; payment method</button>
+      <button class="btn secondary" type="button" id="logout-btn">Sign out</button>
+    </div>
+    <p class="msg" id="acct-msg"></p>
+  </section>
+
+  <section class="card" id="plans" hidden>
+    <h2>Choose a plan</h2>
+    <div class="plan-grid">
+      <div class="plan" data-plan="standard">
+        <h3>Standard</h3>
+        <p class="price">€36 <small>/ month + IVA</small></p>
+        <p>For one person working their own deals. Full analysis, cadastral
+           lookups, feasibility memoranda.</p>
+        <button class="btn" type="button" data-checkout="standard">Choose Standard</button>
+      </div>
+      <div class="plan" data-plan="pro">
+        <h3>Pro / Group / Agency</h3>
+        <p class="price">€72 <small>/ month + IVA</small></p>
+        <p>For agencies and teams working several transactions at once, with
+           a larger included allowance.</p>
+        <button class="btn" type="button" data-checkout="pro">Choose Pro</button>
+      </div>
+    </div>
+    <p class="note">
+      Prices are exclusive of IVA; the correct rate is added at checkout, and
+      EU businesses with a valid VAT number are reverse-charged. See the
+      <a href="subscription-terms.html">Subscription &amp; Refunds</a> terms.
+    </p>
+  </section>
+
+  <section class="card" id="offline" hidden>
+    <h2>Accounts are not switched on yet</h2>
+    <p class="note" style="margin-top:0">
+      Alla is running open while the billing layer is being finished — nothing
+      to sign in to, and nothing to pay. Everything on
+      <a href="index.html">agentalla.com</a> works as it is.
+    </p>
+  </section>
+</main>
+
+<footer class="legal-foot">
+  <p>ROILITY, S.L. · <a href="index.html">agentalla.com</a> · <a href="faq.html">FAQ</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="subscription-terms.html">Subscription</a></p>
+</footer>
+
+<script src="account.js"></script>
+
+</body>
+</html>
