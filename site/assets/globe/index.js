@@ -44,7 +44,7 @@ function g(L, e = {}) {
     if (!(d || v || t || !b || c <= 0 || h() || f)) {
       v = !0;
       try {
-        const { createGlobeRenderer: A } = await import("./renderer-vBB_hseg.js");
+        const { createGlobeRenderer: A } = await import("./renderer.bundle.js");
         if (d || h()) return;
         t = A(n, e.continents !== !1), t.resize(c), N(), f || (a.dataset.state = "webgl"), r();
       } catch {
