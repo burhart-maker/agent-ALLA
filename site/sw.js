@@ -12,7 +12,7 @@
 //     quietly refreshed in the background for next time.
 //
 // Bump CACHE_VERSION whenever the precached shell changes.
-const CACHE_VERSION = "alla-v1";
+const CACHE_VERSION = "alla-v2";
 const SHELL_CACHE = CACHE_VERSION + "-shell";
 const RUNTIME_CACHE = CACHE_VERSION + "-runtime";
 
@@ -21,9 +21,7 @@ const SHELL = [
   "/",
   "/assets/globe/index.js",
   "/assets/globe/style.css",
-  "/assets/globe/renderer-vBB_hseg.js",
-  "/assets/globe/vendor/three.module.js",
-  "/assets/globe/vendor/three.core.min.js",
+  "/assets/globe/renderer.bundle.js",
   "/assets/logo-sphere.svg",
   "/assets/pwa/icon-192.png",
   "/manifest.webmanifest",

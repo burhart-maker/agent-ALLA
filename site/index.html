@@ -17,9 +17,6 @@
 <meta name="apple-mobile-web-app-title" content="Agent ALLA">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="assets/globe/style.css">
-<script type="importmap">
-  { "imports": { "three": "./assets/globe/vendor/three.module.js" } }
-</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
@@ -761,72 +758,14 @@
   @media (prefers-reduced-motion: reduce) { .orb-link { animation: none; } }
 
   /* ================= INSTALL BAR ================= */
-  .inst-bar {
-    position: fixed;
-    left: 12px;
-    right: 12px;
-    /* Clear of the iPhone home indicator and of Safari's bottom toolbar. */
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    z-index: 60;
-    margin: 0 auto;
-    max-width: 560px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 14px;
-    border-radius: 16px;
-    border: 1px solid var(--line);
-    background: var(--paper-raised);
-    box-shadow: 0 12px 34px rgba(20, 10, 20, 0.18);
-    font-size: 14px;
-    /* Slides up rather than appearing, so it reads as an offer and not as an
-       error that just popped. */
-    transform: translateY(140%);
-    opacity: 0;
-    transition: transform 0.32s cubic-bezier(.2,.8,.3,1), opacity 0.32s ease;
-  }
-  .inst-bar[hidden] { display: none; }
-  .inst-bar.inst-in { transform: translateY(0); opacity: 1; }
-  .inst-icon { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%; display: block; }
-  .inst-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.35; }
-  .inst-text strong { font-weight: 600; color: var(--ink); }
-  .inst-text span { color: var(--ink-soft); font-size: 13px; }
-  .inst-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
-  .inst-yes {
-    font: inherit;
-    font-weight: 600;
-    font-size: 14px;
-    padding: 9px 16px;
-    border-radius: 100px;
-    border: 0;
-    background: var(--accent-strong);
-    color: #fff;
-    cursor: pointer;
-  }
-  .inst-yes:hover { background: var(--accent); }
-  .inst-yes[hidden] { display: none; }
-  .inst-no {
-    font: inherit;
-    font-size: 13px;
-    padding: 9px 10px;
-    border: 0;
-    background: none;
-    color: var(--ink-soft);
-    cursor: pointer;
-    text-decoration: underline;
-  }
   /* On a phone the Share button the iOS text refers to sits at the very
      bottom of Safari, so the bar stacks and points down at it. */
   @media (max-width: 520px) {
-    .inst-bar { flex-wrap: wrap; gap: 10px 12px; }
     /* Icon and text stay on the first line; the buttons take the second.
        Without a small flex-basis the long sentence pushes itself onto its
        own row and leaves the icon stranded. */
-    .inst-text { flex: 1 1 120px; }
-    .inst-actions { width: 100%; justify-content: flex-end; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .inst-bar { transition: none; }
   }
 
   .app-badge {
@@ -3632,17 +3571,6 @@
      visitor has seen Alla work. Everything else about the page is unchanged:
      it is fixed-position, so it shifts no layout, and it hides itself while
      the person is typing so it can never sit on top of the input. -->
-<div class="inst-bar" id="inst-bar" hidden>
-  <img class="inst-icon" src="assets/pwa/icon-192.png" alt="" width="44" height="44">
-  <div class="inst-text">
-    <strong id="inst-title"></strong>
-    <span id="inst-body"></span>
-  </div>
-  <div class="inst-actions">
-    <button type="button" class="inst-yes" id="inst-yes" hidden></button>
-    <button type="button" class="inst-no" id="inst-no"></button>
-  </div>
-</div>
 
 <script>
 (function () {
@@ -4627,157 +4555,6 @@
   })();
 </script>
 
-<script>
-  // ===== Install bar =====
-  // Getting Alla onto a phone should take one tap, and nobody should have to
-  // find a download page to discover that tap. So the page offers it itself,
-  // once, at the moment the visitor has already seen Alla answer — not on
-  // arrival, when an install offer is only noise.
-  //
-  // Three cases, decided by what the browser can actually do:
-  //   1. Chrome / Edge / Samsung on Android, Chrome / Edge on desktop — they
-  //      fire `beforeinstallprompt`, so the bar carries a real Install button
-  //      and one tap does the whole thing.
-  //   2. Safari on iPhone / iPad — Apple exposes no install API at all, so
-  //      the bar shows the two-step Share instruction instead of a dead
-  //      button.
-  //   3. Anything else (Firefox, desktop Safari, an in-app webview, or an
-  //      already-installed copy) — no bar at all. A browser that cannot
-  //      install should not be told to.
-  (function () {
-    "use strict";
-
-    var bar = document.getElementById("inst-bar");
-    if (!bar) return;
-
-    var T = window.ALLA_T || {};
-    var KEY = "alla_install_bar";
-    var HIDE_DAYS = 30;
-
-    function remembered() {
-      try {
-        var v = localStorage.getItem(KEY);
-        if (!v) return false;
-        if (v === "installed") return true;
-        return Date.now() < Number(v);
-      } catch (e) { return false; }
-    }
-    function remember(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
-
-    // Already running as an installed app — a standalone window, or added to
-    // the iOS home screen. Nothing left to offer.
-    var standalone =
-      (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
-      window.navigator.standalone === true;
-    if (standalone || remembered()) return;
-
-    var ua = navigator.userAgent || "";
-    var isIOS = /iPhone|iPad|iPod/i.test(ua) ||
-                (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    // On iOS only Safari can add to the home screen. Chrome and Firefox there
-    // are Safari underneath but without that menu item, so telling their users
-    // to "tap Share" would send them to a menu that has no such entry.
-    var isIOSSafari = isIOS && /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
-
-    var deferred = null;
-    var shown = false;
-
-    var titleEl = document.getElementById("inst-title");
-    var bodyEl = document.getElementById("inst-body");
-    var yesBtn = document.getElementById("inst-yes");
-    var noBtn = document.getElementById("inst-no");
-
-    // A computer has no "home screen" — there the honest phrasing is an app
-    // window with its own icon. A coarse pointer is the reliable way to tell
-    // a phone or tablet from a laptop; the user agent string is not.
-    var handheld = isIOS || /Android/i.test(ua) ||
-      (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
-
-    titleEl.textContent =
-      (handheld ? T.instTitle : (T.instTitleDesk || T.instTitle)) || "Install Alla";
-    noBtn.textContent = T.instNo || "Not now";
-    yesBtn.textContent = T.instYes || "Install";
-
-    function open() {
-      if (shown) return;
-      shown = true;
-      bar.hidden = false;
-      // one frame, so the transition has a starting point to animate from
-      requestAnimationFrame(function () { bar.classList.add("inst-in"); });
-    }
-    function close(persist) {
-      bar.classList.remove("inst-in");
-      setTimeout(function () { bar.hidden = true; }, 340);
-      if (persist) remember(persist);
-    }
-    function snooze() { return String(Date.now() + HIDE_DAYS * 86400000); }
-
-    noBtn.addEventListener("click", function () { close(snooze()); });
-
-    yesBtn.addEventListener("click", function () {
-      if (!deferred) return;
-      yesBtn.disabled = true;
-      deferred.prompt();
-      Promise.resolve(deferred.userChoice).catch(function () { return null; }).then(function () {
-        deferred = null;
-        yesBtn.disabled = false;
-        close(snooze());
-      });
-    });
-
-    window.addEventListener("appinstalled", function () {
-      remember("installed");
-      titleEl.textContent = T.instDone || "Done.";
-      bodyEl.textContent = "";
-      yesBtn.hidden = true;
-      setTimeout(function () { close(); }, 2200);
-    });
-
-    // A fixed bar at the bottom must never sit on top of what someone is
-    // typing into, so it steps aside while the composer has focus.
-    var input = document.querySelector(".composer input, .composer textarea");
-    if (input) {
-      input.addEventListener("focus", function () { bar.classList.remove("inst-in"); });
-      input.addEventListener("blur", function () {
-        if (shown && !bar.hidden) setTimeout(function () { bar.classList.add("inst-in"); }, 250);
-      });
-    }
-
-    // Offer it once Alla has actually answered something — that is when an
-    // install is worth having — and otherwise after a long while on the page.
-    var armed = false;
-    function arm() {
-      if (armed) return;
-      armed = true;
-      var replied = false;
-      var log = document.querySelector(".chat-scroll");
-      if (log && window.MutationObserver) {
-        var obs = new MutationObserver(function () {
-          if (replied) return;
-          replied = true;
-          obs.disconnect();
-          setTimeout(open, 1400);
-        });
-        obs.observe(log, { childList: true, subtree: true });
-      }
-      setTimeout(function () { if (!replied) open(); }, 40000);
-    }
-
-    if (isIOSSafari) {
-      bodyEl.textContent = T.instIos || "Tap Share, then Add to Home Screen.";
-      yesBtn.hidden = true;   // Apple gives no API — the instruction is the offer
-      arm();
-    } else {
-      bodyEl.textContent = (handheld ? T.instBody : (T.instBodyDesk || T.instBody)) || "";
-      window.addEventListener("beforeinstallprompt", function (e) {
-        e.preventDefault();
-        deferred = e;
-        yesBtn.hidden = false;
-        arm();
-      });
-    }
-  })();
-</script>
 
 <script>
   // Keep the chat card's width visually matched to the hero heading above
