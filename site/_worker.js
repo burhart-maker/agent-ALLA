@@ -987,6 +987,20 @@ async function handleTranscribe(request, env, cfg, ctx) {
   // and no upstream error body is passed back to the browser.
   const key = env.OPENAI_API_KEY;
   if (!key) return jsonError(503, "transcribe_not_configured");
+  try {
+    return await transcribe(request, env, cfg, ctx, key);
+  } catch (e) {
+    // An uncaught throw here would surface as Cloudflare's own 502 HTML page,
+    // which tells nobody anything. Report the message instead — with the key
+    // scrubbed, in the unlikely event it ever appears inside one.
+    let detail = String((e && e.message) || e).slice(0, 200);
+    if (key && detail.indexOf(key) !== -1) detail = detail.split(key).join("[redacted]");
+    return new Response(JSON.stringify({ error: "transcribe_exception", detail }),
+                        { status: 500, headers: { "content-type": "application/json" } });
+  }
+}
+
+async function transcribe(request, env, cfg, ctx, key) {
 
   const rawType = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
   const ext = AUDIO_EXT[rawType];
