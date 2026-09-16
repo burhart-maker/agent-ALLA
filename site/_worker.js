@@ -996,7 +996,7 @@ async function handleTranscribe(request, env, cfg, ctx) {
     let detail = String((e && e.message) || e).slice(0, 200);
     if (key && detail.indexOf(key) !== -1) detail = detail.split(key).join("[redacted]");
     return new Response(JSON.stringify({ error: "transcribe_exception", detail }),
-                        { status: 500, headers: { "content-type": "application/json" } });
+                        { status: 422, headers: { "content-type": "application/json" } });
   }
 }
 
@@ -1043,7 +1043,7 @@ async function transcribe(request, env, cfg, ctx, key) {
       body: fd
     });
   } catch (e) {
-    return jsonError(502, "transcribe_failed");
+    return jsonError(422, "transcribe_failed");
   }
 
   if (!upstream.ok) {
@@ -1058,9 +1058,11 @@ async function transcribe(request, env, cfg, ctx, key) {
       const code = err && err.error && (err.error.code || err.error.type);
       if (typeof code === "string") reason = code.slice(0, 40);
     } catch (e) { /* non-JSON upstream error */ }
+    // 422, not 502: Cloudflare replaces 502/503/504 from a Worker with its own
+    // branded error page, which swallows this body entirely.
     return new Response(JSON.stringify({
       error: "transcribe_failed", upstream: upstream.status, reason
-    }), { status: 502, headers: { "content-type": "application/json" } });
+    }), { status: 422, headers: { "content-type": "application/json" } });
   }
 
   let text = "";
