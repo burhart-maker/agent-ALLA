@@ -1033,10 +1033,20 @@ async function handleTranscribe(request, env, cfg, ctx) {
   }
 
   if (!upstream.ok) {
-    // Upstream text is swallowed deliberately: it is not useful to the person
-    // and must never become a channel for anything about the credential.
-    return jsonError(upstream.status === 429 ? 429 : 502,
-                     upstream.status === 429 ? "transcribe_rate_limited" : "transcribe_failed");
+    // The upstream BODY is never passed through — it is not useful to the
+    // person and must never become a channel for anything about the key. But
+    // the short machine-readable reason is: without it an upstream problem
+    // (no credit on the account, say) is indistinguishable from our own rate
+    // limit, which sent one earlier debugging session down the wrong path.
+    let reason = "";
+    try {
+      const err = await upstream.json();
+      const code = err && err.error && (err.error.code || err.error.type);
+      if (typeof code === "string") reason = code.slice(0, 40);
+    } catch (e) { /* non-JSON upstream error */ }
+    return new Response(JSON.stringify({
+      error: "transcribe_failed", upstream: upstream.status, reason
+    }), { status: 502, headers: { "content-type": "application/json" } });
   }
 
   let text = "";
