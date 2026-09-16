@@ -730,6 +730,14 @@ async function loadSettings(env) {
     anonPerDay: num("anon_messages_per_day", 5),
     allowanceEur: { standard: num("allowance_standard_eur", 10), pro: num("allowance_pro_eur", 25) },
     priceId: { standard: out.price_id_standard || "", pro: out.price_id_pro || "" },
+    // Speech-to-text is billed per MINUTE OF AUDIO, not per token, so it needs
+    // its own rate and its own column in the ledger. Everything here is a
+    // settings row so the price can be corrected without a deploy.
+    transcribeModel: out.transcribe_model || "gpt-transcribe",
+    transcribeUsdPerMin: num("transcribe_usd_per_min", 0.0045),
+    transcribeMaxSeconds: num("transcribe_max_seconds", 120),
+    transcribeMaxBytes: num("transcribe_max_bytes", 8000000),
+    transcribeMaxPerHour: num("transcribe_max_per_hour", 40),
     billingEnabled: out.billing_enabled === "1"
   };
 }
@@ -813,7 +821,7 @@ async function currentUser(request, env) {
 
 // Token counts -> micro-euros, using the DB price row and FX setting so a
 // vendor price change is an UPDATE, not a deploy.
-async function eurMicrosFor(env, cfg, model, inTok, outTok, searches) {
+async function eurMicrosFor(env, cfg, model, inTok, outTok, searches, audioSeconds) {
   let price = null;
   try {
     price = await env.DB.prepare("SELECT * FROM model_prices WHERE model = ?").bind(model).first();
@@ -822,7 +830,8 @@ async function eurMicrosFor(env, cfg, model, inTok, outTok, searches) {
   const outRate = price ? price.output_usd_per_mtok : 15.0;
   const usd = (inTok / 1e6) * inRate
             + (outTok / 1e6) * outRate
-            + (searches || 0) * (cfg.searchUsd || 0);
+            + (searches || 0) * (cfg.searchUsd || 0)
+            + ((audioSeconds || 0) / 60) * (cfg.transcribeUsdPerMin || 0);
   return Math.round(usd * cfg.usdToEur * 1e6);
 }
 
@@ -923,6 +932,123 @@ async function recordUsage(env, cfg, actor, model, inTok, outTok, searches) {
     ).bind(actor.trialStarted, actor.user.id));
   }
   try { await env.DB.batch(stmts); } catch (e) { /* metering must never break a reply */ }
+}
+
+// ---------- speech to text ----------
+//
+// The browser records audio and posts the bytes here; the key never leaves
+// the worker. Language is deliberately NOT sent: the model detects it, which
+// is the whole point of moving off the browser's own recogniser.
+
+// Only what OpenAI's transcription endpoint actually accepts. The value is the
+// filename extension, because that is what the API uses to sniff the format —
+// the MIME type on the part is not enough on its own.
+const AUDIO_EXT = {
+  "audio/webm": "webm",      // Chrome, Edge, Android
+  "audio/mp4": "mp4",        // Safari (macOS and iOS)
+  "audio/x-m4a": "m4a",
+  "audio/m4a": "m4a",
+  "audio/aac": "m4a",
+  "audio/mpeg": "mp3",
+  "audio/mpga": "mpga",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/wave": "wav",
+  "audio/ogg": "ogg"         // Firefox
+};
+
+// One ledger row per transcription. Deliberately NOT recordUsage(): that one
+// also burns a trial message, and dictating a sentence is not a message.
+async function recordAudioUsage(env, cfg, actor, model, seconds) {
+  if (!hasDB(env) || !actor || actor.kind === "nodb") return;
+  const eur = await eurMicrosFor(env, cfg, model, 0, 0, 0, seconds);
+  try {
+    await env.DB.prepare(
+      `INSERT INTO usage_ledger (user_id, anon_key, at, model, input_tokens, output_tokens, search_requests, audio_seconds, eur_micros)
+       VALUES (?, ?, ?, ?, 0, 0, 0, ?, ?)`
+    ).bind(actor.user ? actor.user.id : null, actor.anonKey || null, nowSec(), model, Math.round(seconds), eur).run();
+  } catch (e) { /* metering must never break dictation */ }
+}
+
+async function audioUsesLastHour(env, actor) {
+  if (!hasDB(env) || !actor) return 0;
+  const since = nowSec() - 3600;
+  const sql = actor.user
+    ? "SELECT COUNT(*) AS n FROM usage_ledger WHERE user_id = ? AND audio_seconds > 0 AND at >= ?"
+    : "SELECT COUNT(*) AS n FROM usage_ledger WHERE anon_key = ? AND audio_seconds > 0 AND at >= ?";
+  try {
+    const row = await env.DB.prepare(sql).bind(actor.user ? actor.user.id : (actor.anonKey || ""), since).first();
+    return row ? Number(row.n) : 0;
+  } catch (e) { return 0; }
+}
+
+async function handleTranscribe(request, env, cfg, ctx) {
+  // The key is read here and nowhere else. It is never logged, never echoed,
+  // and no upstream error body is passed back to the browser.
+  const key = env.OPENAI_API_KEY;
+  if (!key) return jsonError(503, "transcribe_not_configured");
+
+  const rawType = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  const ext = AUDIO_EXT[rawType];
+  if (!ext) return jsonError(415, "audio_type_unsupported");
+
+  const maxBytes = cfg.transcribeMaxBytes || 8000000;
+  const declared = Number(request.headers.get("content-length") || 0);
+  if (declared && declared > maxBytes) return jsonError(413, "audio_too_large");
+
+  // Who is speaking — same resolution as chat, so the row lands on the right
+  // account. gateChat only reads; it has no side effects of its own.
+  const gate = await gateChat(request, env, cfg);
+  if (gate.response) return gate.response;
+  const actor = gate.actor;
+
+  const perHour = cfg.transcribeMaxPerHour || 40;
+  if (await audioUsesLastHour(env, actor) >= perHour) return jsonError(429, "transcribe_rate_limited");
+
+  const buf = await request.arrayBuffer();
+  if (!buf || buf.byteLength < 1024) return jsonError(400, "audio_empty");
+  if (buf.byteLength > maxBytes) return jsonError(413, "audio_too_large");
+
+  // The client reports how long it recorded. It is used only for metering and
+  // is clamped both ways, so a wrong or hostile value cannot distort billing.
+  const maxSec = cfg.transcribeMaxSeconds || 120;
+  let seconds = Number(request.headers.get("x-audio-seconds") || 0);
+  if (!isFinite(seconds) || seconds <= 0) seconds = 1;
+  if (seconds > maxSec) return jsonError(413, "audio_too_long");
+
+  const model = cfg.transcribeModel || "gpt-transcribe";
+  let upstream;
+  try {
+    const fd = new FormData();
+    fd.append("file", new File([buf], "audio." + ext, { type: rawType }));
+    fd.append("model", model);
+    // No `language` on purpose — the model detects it.
+    upstream = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { authorization: "Bearer " + key },
+      body: fd
+    });
+  } catch (e) {
+    return jsonError(502, "transcribe_failed");
+  }
+
+  if (!upstream.ok) {
+    // Upstream text is swallowed deliberately: it is not useful to the person
+    // and must never become a channel for anything about the credential.
+    return jsonError(upstream.status === 429 ? 429 : 502,
+                     upstream.status === 429 ? "transcribe_rate_limited" : "transcribe_failed");
+  }
+
+  let text = "";
+  try {
+    const data = await upstream.json();
+    if (data && typeof data.text === "string") text = data.text.trim();
+  } catch (e) { /* empty text is handled by the client */ }
+
+  const meter = recordAudioUsage(env, cfg, actor, model, seconds);
+  if (ctx && ctx.waitUntil) ctx.waitUntil(meter); else await meter;
+
+  return jsonOk({ text });
 }
 
 // Watches the SSE stream on its way to the browser and pulls the real token
@@ -1286,6 +1412,16 @@ export default {
       const handled = await routeBilling(request, env, url, cfg);
       if (handled) return handled;
       return jsonError(404, "not_found");
+    }
+
+    if (url.pathname === "/api/transcribe") {
+      if (request.method !== "POST") return jsonError(405, "method_not_allowed");
+      const cfg = hasDB(env)
+        ? await loadSettings(env)
+        : { billingEnabled: false, usdToEur: 0.92, anonPerDay: 5, allowanceEur: {}, priceId: {},
+            transcribeModel: "gpt-transcribe", transcribeUsdPerMin: 0.0045,
+            transcribeMaxSeconds: 120, transcribeMaxBytes: 8000000, transcribeMaxPerHour: 40 };
+      return handleTranscribe(request, env, cfg, ctx);
     }
 
     if (url.pathname === "/api/chat") {
