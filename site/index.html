@@ -24,7 +24,7 @@
     --ink: #142129;
     --ink-soft: #3b4a52;
     --paper: #ffffff;
-    --paper-raised: #fbfaf5;
+    --paper-raised: #ffffff;
     --line: #d9d4c5;
     --accent: #e10886;
     --accent-strong: #b8066b;
@@ -32,7 +32,7 @@
     --accent-soft: #fbe3ef;
     --bubble-user: #142129;
     --bubble-user-text: #f1eee5;
-    --bubble-agent: #fbfaf5;
+    --bubble-agent: #ffffff;
     --bubble-agent-text: #142129;
     --shadow: 0 1px 2px rgba(20, 33, 41, 0.06), 0 8px 24px rgba(20, 33, 41, 0.07);
     color-scheme: light;
@@ -4278,12 +4278,20 @@
 
     function stop() {
       wantListening = false;
+      // Сбрасываем накопленное здесь, а не только в start(). recognition.stop()
+      // асинхронный: Chrome успевает прислать ещё один onresult уже после него.
+      // Если finalText/baseText остаются, этот поздний результат перерисовывает
+      // поле ввода — и только что отправленное сообщение появляется в нём снова.
+      finalText = "";
+      baseText = "";
       clearTimeout(stopTimer);
       setListening(false);
       try { recognition.stop(); } catch (e) { /* not running */ }
     }
 
     recognition.onresult = function (e) {
+      // Поздний результат после stop() не должен ничего писать в поле.
+      if (!wantListening) return;
       var interim = "";
       for (var i = e.resultIndex; i < e.results.length; i++) {
         var chunk = e.results[i][0].transcript;
