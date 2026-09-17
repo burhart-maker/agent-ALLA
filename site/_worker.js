@@ -373,9 +373,16 @@ const CATASTRO_TOOL = {
 function looksLikeCadastreQuery(text) {
   if (!text) return false;
   const t = text.toLowerCase();
-  return /catastr|referencia\s+catastral|idealista\.[a-z]+\/inmueble|\bparcela\b|\bsolar\b|edificabilidad|urban[ií]stic|cadastral|cadastre/i.test(
-    t
-  );
+
+  // A pair of decimal degrees is a parcel question even with no keyword at
+  // all: "39.8517, 4.2617" means "what is here".
+  if (/-?\d{1,2}\.\d{3,}\s*[,;]\s*-?\d{1,3}\.\d{3,}/.test(t)) return true;
+
+  // Latin (es/ca/en) AND Cyrillic. The Cyrillic half was missing, so every
+  // cadastre question asked in Russian silently ran without the tool and the
+  // answer came from the model's guesswork instead of the register.
+  return /catastr|referencia\s+catastral|idealista\.[a-z]+\/inmueble|\bparcela\b|\bsolar\b|\bfinca\b|edificabilidad|urban[ií]stic|cadastral|cadastre/i.test(t)
+      || /кадастр|участ[ое]к|парцел|надел|застро[ий]|урбанист|землевладен|межеван/i.test(t);
 }
 
 // One request to a coordinates service. Tries the JSON endpoint and falls
