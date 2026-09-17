@@ -381,11 +381,11 @@
   #expand .ico-in { display: none; }
   .chat-big #expand .ico-out { display: none; }
   .chat-big #expand .ico-in { display: inline; }
-  .chat.chat-big .chat-scroll {
-    height: 72vh;
-    min-height: 420px;
-    max-height: none;
-  }
+  /* Heights are set from the script, because they follow the conversation
+     rather than a breakpoint. The stylesheet only lifts the cap so an inline
+     height can actually take effect. */
+  .chat.chat-big .chat-scroll,
+  .chat .chat-scroll[style*="height"] { max-height: none; }
 
   @media (prefers-reduced-motion: reduce) {
     .chat, .chat-scroll { transition: none; }
@@ -403,7 +403,6 @@
   }
 
   @media (max-width: 640px) {
-    .chat.chat-big .chat-scroll { height: 70vh; min-height: 340px; }
     .chat-scroll { padding: 20px 16px 8px; height: 30vh; min-height: 275px; max-height: 413px; }
   }
 
@@ -4449,52 +4448,82 @@
     };
   })();
 
-  // ---------- expanding the chat ----------
+  // ---------- the chat grows with the conversation ----------
   //
-  // A full feasibility analysis does not fit in a 380px box; reading one there
-  // is the "pager" complaint. So the card can be expanded to a real reading
-  // window, and the choice is remembered — click it once, not once per answer.
-  (function setupExpand() {
+  // The page opens exactly as it always did: hero, heading, a compact chat.
+  // Then the conversation itself stretches it — once people are talking, the
+  // header and footer stop mattering and the reading area is what does. So
+  // the card grows to fit its content, up to most of the viewport, and the
+  // button takes it the rest of the way. Escape (or the collapse button) puts
+  // it back; the next message starts growing it again.
+  (function setupChatHeight() {
     var btn = document.getElementById("expand");
     var chat = document.querySelector(".chat");
-    if (!btn || !chat) return;
+    if (!btn || !chat || !scrollEl) return;
 
-    var KEY = "alla:chat-expanded";
-    var big = false;
+    var AUTO_MAX = 0.70;   // auto-grow stops here — some page stays visible
+    var BIG = 0.88;        // the button goes nearly full height
+    var mode = "auto";     // auto | big | collapsed
 
     function paintLabel() {
-      var label = big ? (T.collapseLabel || "Shrink the chat")
-                      : (T.expandLabel || "Expand the chat");
+      var label = mode === "big" ? (T.collapseLabel || "Shrink the chat")
+                                 : (T.expandLabel || "Expand the chat");
       btn.setAttribute("aria-label", label);
       btn.title = label;
-      btn.setAttribute("aria-expanded", big ? "true" : "false");
+      btn.setAttribute("aria-expanded", mode === "big" ? "true" : "false");
     }
 
-    function apply(next, remember) {
-      big = !!next;
-      chat.classList.toggle("chat-big", big);
+    // Grows the reading area to fit what is in it. Never shrinks below the
+    // size the stylesheet set, so the opening screen is untouched.
+    function fit() {
+      if (mode === "collapsed") return;
+      var cap = Math.round(window.innerHeight * (mode === "big" ? BIG : AUTO_MAX));
+      if (mode === "big") {
+        scrollEl.style.height = cap + "px";
+        return;
+      }
+      // Measure against the natural (stylesheet) height by clearing ours
+      // first. Recomputed from the content every time, so leaving the big
+      // mode lands back on the size the conversation actually needs — an
+      // earlier version kept the old height as a floor and the collapse
+      // button then did nothing.
+      scrollEl.style.height = "";
+      var natural = scrollEl.getBoundingClientRect().height;
+      var needed = scrollEl.scrollHeight;
+      var next = Math.max(natural, Math.min(needed, cap));
+      if (next > natural + 1) scrollEl.style.height = Math.round(next) + "px";
+    }
+
+    function setMode(next) {
+      mode = next;
+      chat.classList.toggle("chat-big", mode === "big");
+      if (mode === "collapsed") scrollEl.style.height = "";
       paintLabel();
-      if (remember) {
-        // Storage can be unavailable (private window, blocked site data); the
-        // toggle must keep working either way.
-        try { localStorage.setItem(KEY, big ? "1" : "0"); } catch (e) {}
-      }
-      // Keep the composer in view when the card grows past the fold.
-      if (big) {
-        try { chat.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {}
-      }
+      fit();
       scrollEl.scrollTop = scrollEl.scrollHeight;
     }
 
-    var saved = null;
-    try { saved = localStorage.getItem(KEY); } catch (e) {}
-    apply(saved === "1", false);
+    paintLabel();
 
-    btn.addEventListener("click", function () { apply(!big, true); });
+    btn.addEventListener("click", function () {
+      setMode(mode === "big" ? "auto" : "big");
+      if (mode === "big") {
+        try { chat.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {}
+      }
+    });
 
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && big) apply(false, true);
+      if (e.key === "Escape" && mode !== "collapsed") setMode("collapsed");
     });
+
+    window.addEventListener("resize", fit);
+
+    // Called by addMessage() and by the streaming callback: this is what makes
+    // the conversation itself do the stretching.
+    window.__allaFitChat = function (fromUser) {
+      if (fromUser && mode === "collapsed") mode = "auto";   // a new message revives it
+      fit();
+    };
   })();
 
   // ---------- voice input ----------
@@ -4821,6 +4850,7 @@
     inputEl.value = "";
     autoGrow();
 
+    if (window.__allaFitChat) window.__allaFitChat(true);
     addMessage("user", files.length ? text + "\n\n" + files.map(function (f) { return "📎 " + f.name; }).join("\n") : text);
     // History keeps the text only: the document itself is sent once, with this
     // message. Re-sending it every turn would multiply one reading's cost by
@@ -4839,6 +4869,7 @@
           started = true;
         }
         thinkingBubble.textContent = partial;
+        if (window.__allaFitChat) window.__allaFitChat(false);
         scrollEl.scrollTop = scrollEl.scrollHeight;
       }, files);
 
