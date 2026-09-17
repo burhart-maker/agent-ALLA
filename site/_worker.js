@@ -456,6 +456,56 @@ function jsonError(status, error) {
   });
 }
 
+// ---------- attachments ----------
+//
+// Anthropic reads PDFs and images natively, so there is no parser here — the
+// bytes are passed through as content blocks. Limits are deliberately well
+// under the API's own 32MB/100-page ceiling: a PDF costs 1,500-3,000 input
+// tokens PER PAGE, so an unbounded upload is an unbounded bill.
+const ATTACH_KIND = {
+  "application/pdf": "document",
+  "image/png": "image",
+  "image/jpeg": "image",
+  "image/gif": "image",
+  "image/webp": "image"
+};
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACH_BYTES = 8 * 1024 * 1024;   // per file
+const MAX_ATTACH_TOTAL = 20 * 1024 * 1024;  // per message
+
+// Attaches the files to the NEWEST user turn, turning its content from a
+// string into a block array. Older turns keep their text only: re-sending a
+// document on every follow-up would multiply the cost of one reading by the
+// length of the conversation, and the model's own previous answer already
+// carries what it found.
+function attachFiles(cleaned, raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  if (raw.length > MAX_ATTACHMENTS) return jsonError(400, "too_many_files");
+
+  const blocks = [];
+  let total = 0;
+  for (const a of raw) {
+    if (!a || typeof a.type !== "string" || typeof a.data !== "string") {
+      return jsonError(400, "invalid_attachment");
+    }
+    const kind = ATTACH_KIND[a.type];
+    if (!kind) return jsonError(415, "file_type_unsupported");
+    const bytes = Math.floor(a.data.length * 3 / 4);  // base64 -> bytes
+    if (bytes > MAX_ATTACH_BYTES) return jsonError(413, "file_too_large");
+    total += bytes;
+    if (total > MAX_ATTACH_TOTAL) return jsonError(413, "files_too_large");
+    blocks.push({ type: kind, source: { type: "base64", media_type: a.type, data: a.data } });
+  }
+
+  for (let i = cleaned.length - 1; i >= 0; i--) {
+    if (cleaned[i].role === "user") {
+      cleaned[i].content = blocks.concat([{ type: "text", text: cleaned[i].content }]);
+      return null;
+    }
+  }
+  return jsonError(400, "invalid_history");
+}
+
 async function handleChatPost(request, env) {
   if (!env.ANTHROPIC_API_KEY) {
     return jsonError(500, "server_not_configured");
@@ -496,6 +546,11 @@ async function handleChatPost(request, env) {
   const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
   const lastUserMessage = [...cleaned].reverse().find((m) => m.role === "user");
   const useCadastreTool = looksLikeCadastreQuery(lastUserMessage && lastUserMessage.content);
+
+  // After the cadastre check, which needs plain text: this turns the newest
+  // user message's content into blocks.
+  const attachError = attachFiles(cleaned, body && body.attachments);
+  if (attachError) return attachError;
 
   if (!useCadastreTool) {
     // Original fast path: single streamed call, no tools. Unchanged from
