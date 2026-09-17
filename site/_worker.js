@@ -269,6 +269,16 @@ const SYSTEM_PROMPT = CORE_INSTRUCTIONS + "\n\n---\n\n" + TENANT_OVERLAY;
 const CATASTRO_BASE =
   "http://ovc.catastro.meh.es/OVCServWeb/OVCWcfCallejero/COVCCallejero.svc/json/";
 
+// The coordinates services live on a DIFFERENT endpoint from the street/
+// reference ones. These are what tie a cadastral parcel to a point on a map:
+//   Consulta_RCCOOR — a point (lon/lat) -> the cadastral reference under it
+//   Consulta_CPMRC  — a cadastral reference -> its point (lon/lat)
+// Both are free and need no key.
+const CATASTRO_COORD_JSON =
+  "http://ovc.catastro.meh.es/ovcservweb/OVCSWLocalizacionRC/OVCCoordenadas.svc/json/";
+const CATASTRO_COORD_XML =
+  "http://ovc.catastro.meh.es/ovcservweb/OVCSWLocalizacionRC/OVCCoordenadas.asmx/";
+
 // Anthropic's server-side web search. Nothing to implement here: the API runs
 // the search itself and returns the result inside the same response, so it
 // works on the fast streaming path as well as on the tool round-trip path, and
@@ -308,8 +318,14 @@ const CATASTRO_TOOL = {
     "data and must never be inferred from this tool's result. Call this " +
     "whenever the person gives a specific Spanish address or a referencia " +
     "catastral and wants real facts about that parcel, instead of guessing. " +
-    "Provide either referencia_catastral, or nombre_via + numero, together " +
-    "with provincia and municipio.",
+    "Provide either referencia_catastral, or nombre_via + numero, or lat + lon, " +
+    "together with provincia and municipio. It also ties the parcel to a map: " +
+    "given lat/lon (a pin dropped on Google Maps, a phone's location, coordinates " +
+    "from a listing) it returns the cadastral reference of the parcel under that " +
+    "point AND its full record; given a reference or an address it returns the " +
+    "parcel's coordinates plus ready map links. Use it whenever the person asks " +
+    "where a parcel is, what is at a point, or wants an address, a reference and " +
+    "a map position matched to each other.",
   input_schema: {
     type: "object",
     properties: {
@@ -323,7 +339,15 @@ const CATASTRO_TOOL = {
       },
       referencia_catastral: {
         type: "string",
-        description: "Full or partial cadastral reference, if the person already has one (from a listing or informe urbanistico). Use this OR the street fields below, not both."
+        description: "Full or partial cadastral reference, if the person already has one (from a listing or informe urbanistico). Use this OR the street fields OR lat/lon, not several at once."
+      },
+      lat: {
+        type: "number",
+        description: "Latitude in WGS84 (EPSG:4326), e.g. 39.9163. Use together with lon to find which parcel sits under a point on the map."
+      },
+      lon: {
+        type: "number",
+        description: "Longitude in WGS84 (EPSG:4326), e.g. 4.2649 — negative west of Greenwich. Use together with lat."
       },
       tipo_via: {
         type: "string",
@@ -354,11 +378,94 @@ function looksLikeCadastreQuery(text) {
   );
 }
 
+// One request to a coordinates service. Tries the JSON endpoint and falls
+// back to the XML one, because the .svc/json path is not documented as
+// reliably as the .asmx path and a 404 here would otherwise cost a deploy.
+async function catastroCoord(op, params) {
+  const qs = new URLSearchParams(params).toString();
+  try {
+    const res = await fetch(CATASTRO_COORD_JSON + op + "?" + qs, { headers: { accept: "application/json" } });
+    const raw = await res.text();
+    try { return { format: "json", status: res.status, data: JSON.parse(raw) }; }
+    catch (e) { /* not JSON — fall through to XML */ }
+  } catch (e) { /* network — fall through */ }
+  try {
+    const res = await fetch(CATASTRO_COORD_XML + op + "?" + qs);
+    const raw = await res.text();
+    return { format: "xml", status: res.status, data: raw.slice(0, 4000) };
+  } catch (e) {
+    return { error: "fetch_failed", message: String((e && e.message) || e) };
+  }
+}
+
+// Pulls lon/lat out of either shape. The services answer with xcen/ycen.
+function pickCoords(payload) {
+  if (!payload) return null;
+  if (payload.format === "json") {
+    const j = JSON.stringify(payload.data);
+    const m = j.match(/"xcen"\s*:\s*"?(-?[\d.]+)"?[\s\S]{0,80}?"ycen"\s*:\s*"?(-?[\d.]+)"?/i);
+    if (m) return { lon: Number(m[1]), lat: Number(m[2]) };
+  }
+  const t = typeof payload.data === "string" ? payload.data : JSON.stringify(payload.data || "");
+  const m2 = t.match(/xcen[>"']*\s*[:>]?\s*"?(-?[\d.]+)/i);
+  const m3 = t.match(/ycen[>"']*\s*[:>]?\s*"?(-?[\d.]+)/i);
+  if (m2 && m3) return { lon: Number(m2[1]), lat: Number(m3[1]) };
+  return null;
+}
+
+// Pulls the first cadastral reference out of a coordinates answer.
+function pickRef(payload) {
+  const t = typeof payload.data === "string" ? payload.data : JSON.stringify(payload.data || "");
+  const pc = t.match(/"pc1"\s*:\s*"([^"]+)"[\s\S]{0,60}?"pc2"\s*:\s*"([^"]+)"/i)
+          || t.match(/<pc1>([^<]+)<\/pc1>\s*<pc2>([^<]+)<\/pc2>/i);
+  if (pc) return (pc[1] + pc[2]).trim();
+  const rc = t.match(/"rc"\s*:\s*"([A-Z0-9]{14,20})"/i) || t.match(/<rc>([A-Z0-9]{14,20})<\/rc>/i);
+  return rc ? rc[1].trim() : null;
+}
+
+// A point anyone can click, with no Google key and no per-call cost. The
+// satellite link is the one that actually helps on a plot with no street view.
+function mapLinks(lat, lon) {
+  if (typeof lat !== "number" || typeof lon !== "number" || !isFinite(lat) || !isFinite(lon)) return null;
+  const q = lat.toFixed(7) + "," + lon.toFixed(7);
+  return {
+    coordinates: { lat: Number(lat.toFixed(7)), lon: Number(lon.toFixed(7)) },
+    google_maps: "https://www.google.com/maps?q=" + q,
+    google_satellite: "https://www.google.com/maps/@" + q + ",300m/data=!3m1!1e3",
+    catastro_viewer: "https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat="
+  };
+}
+
 async function runCatastroTool(input) {
   input = input || {};
   const provincia = String(input.provincia || "").trim();
   const municipio = String(input.municipio || "").trim();
   let op, params;
+
+  // A point on the map -> the parcel under it. This is the direction that was
+  // missing: an agent standing on a plot, or a pin dropped on Google Maps,
+  // now resolves to a cadastral reference and from there to the full record.
+  const lat = Number(input.lat), lon = Number(input.lon);
+  if (isFinite(lat) && isFinite(lon) && !input.referencia_catastral) {
+    const hit = await catastroCoord("Consulta_RCCOOR", {
+      SRS: "EPSG:4326", Coordenada_X: String(lon), Coordenada_Y: String(lat)
+    });
+    const ref = pickRef(hit);
+    const out = {
+      source: "Sede Electronica del Catastro (free public service; not a legally certified extract)",
+      operation: "Consulta_RCCOOR",
+      asked_point: { lat: lat, lon: lon },
+      referencia_catastral: ref,
+      result: hit,
+      map: mapLinks(lat, lon)
+    };
+    // With a reference in hand, fetch the full record too, so one question
+    // gives the agent everything instead of two round trips.
+    if (ref && provincia && municipio) {
+      out.full_record = await catastroByRef(provincia, municipio, ref);
+    }
+    return out;
+  }
 
   if (input.referencia_catastral) {
     op = "Consulta_DNPRC";
@@ -380,6 +487,7 @@ async function runCatastroTool(input) {
   }
 
   const url = CATASTRO_BASE + op + "?" + new URLSearchParams(params).toString();
+  let out;
   try {
     const res = await fetch(url, { headers: { accept: "application/json" } });
     const raw = await res.text();
@@ -389,12 +497,46 @@ async function runCatastroTool(input) {
     } catch (e) {
       parsed = { unparsed_response: raw.slice(0, 4000) };
     }
-    return {
+    out = {
       source: "Sede Electronica del Catastro (free public service; not a legally certified extract)",
       operation: op,
       http_status: res.status,
       result: parsed
     };
+  } catch (e) {
+    return { error: "fetch_failed", message: String((e && e.message) || e) };
+  }
+
+  // Whichever way the parcel was found, finish by placing it on a map: the
+  // reference alone tells an agent nothing about where the plot actually is.
+  const ref = input.referencia_catastral
+    ? String(input.referencia_catastral).trim()
+    : pickRef({ data: out.result });
+  if (ref && provincia && municipio) {
+    const pt = await catastroCoord("Consulta_CPMRC", {
+      Provincia: provincia, Municipio: municipio, SRS: "EPSG:4326", RC: ref
+    });
+    const c = pickCoords(pt);
+    if (c) {
+      out.map = mapLinks(c.lat, c.lon);
+      out.map.catastro_viewer += encodeURIComponent(ref);
+    } else {
+      out.map_lookup = pt;   // so a failure is visible rather than silently absent
+    }
+    out.referencia_catastral = ref;
+  }
+  return out;
+}
+
+// The full record for a reference — used after a point resolves to one.
+async function catastroByRef(provincia, municipio, ref) {
+  const url = CATASTRO_BASE + "Consulta_DNPRC?" + new URLSearchParams({
+    Provincia: provincia, Municipio: municipio, RC: ref
+  }).toString();
+  try {
+    const res = await fetch(url, { headers: { accept: "application/json" } });
+    const raw = await res.text();
+    try { return JSON.parse(raw); } catch (e) { return { unparsed_response: raw.slice(0, 4000) }; }
   } catch (e) {
     return { error: "fetch_failed", message: String((e && e.message) || e) };
   }
