@@ -231,6 +231,16 @@ const CORE_INSTRUCTIONS = [
   "listing is the seller's own description: the surface, the licence status and ",
   "the condition are claims until the cadastre or the register confirms them, ",
   "so check the reference with catastro_lookup when the answer depends on it.\n\n",
+  "Written reports: you produce them yourself. property_report lays out a full ",
+  "memorandum in the ROILITY house style — cover, key metrics, then only the ",
+  "sections you have material for — and returns a link the person can open and ",
+  "forward. Use it when someone asks for a report, a memorandum, an informe or ",
+  "\"as a PDF\"; answer in the chat as usual otherwise. Write the document in the ",
+  "language the person is writing in, headings included. Never claim you cannot ",
+  "produce a document, and never describe a report you have not actually made: ",
+  "call the tool, then give the person the link exactly as it comes back. If the ",
+  "tool returns an error, say what failed in one sentence rather than offering a ",
+  "file that does not exist.\n\n",
   "Use both live tools together where the question deserves it: catastro_lookup ",
   "for what the property legally IS (reference, surfaces, use class, year), ",
   "web_search for everything around it that moves the result — the current ",
@@ -804,7 +814,13 @@ async function handleChatPost(request, env, cfg) {
 
   const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
   const lastUserMessage = [...cleaned].reverse().find((m) => m.role === "user");
-  const useCadastreTool = looksLikeCadastreQuery(lastUserMessage && lastUserMessage.content);
+  const lastText = lastUserMessage && lastUserMessage.content;
+  const useCadastreTool = looksLikeCadastreQuery(lastText);
+  // A report has to be written, stored and linked, all of which this Worker
+  // does itself — so a turn that asks for one takes the tool path, exactly as
+  // a cadastral question does.
+  const useReportTool = looksLikeReportRequest(lastText);
+  const useTools = useCadastreTool || useReportTool;
 
   // Only a turn that actually mentions a listing gets the extra server. It is
   // attached to whichever path the turn was already taking, and askAnthropic()
@@ -852,7 +868,7 @@ async function handleChatPost(request, env, cfg) {
   const attachError = attachFiles(cleaned, body && body.attachments);
   if (attachError) return attachError;
 
-  if (!useCadastreTool) {
+  if (!useTools) {
     // Original fast path: single streamed call, no tools. Unchanged from
     // before this session's cadastre-lookup work so the common case (general
     // advice, no specific parcel/address) keeps its original low latency.
@@ -919,7 +935,9 @@ async function handleChatPost(request, env, cfg) {
           // is, the search says what the rules and the prices around it are.
           // Web search runs server-side, so the loop below only ever has to
           // execute catastro_lookup itself.
-          tools: [CATASTRO_TOOL, WEB_SEARCH_TOOL],
+          // catastro_lookup and property_report are both executed below by
+          // this Worker; web search runs inside Anthropic's own turn.
+          tools: [CATASTRO_TOOL, REPORT_TOOL, WEB_SEARCH_TOOL],
           messages
       });
     } catch (e) {
@@ -969,12 +987,15 @@ async function handleChatPost(request, env, cfg) {
     // knows how to run. Web search arrives as server_tool_use and is already
     // executed by Anthropic, so it must never reach runCatastroTool.
     const toolUseBlocks = (data.content || [])
-      .filter((b) => b.type === "tool_use" && b.name === "catastro_lookup");
+      .filter((b) => b.type === "tool_use" &&
+                     (b.name === "catastro_lookup" || b.name === "property_report"));
     messages.push({ role: "assistant", content: data.content });
 
     const toolResults = [];
     for (const block of toolUseBlocks) {
-      const result = await runCatastroTool(block.input);
+      const result = block.name === "property_report"
+        ? await runReportTool(block.input, env, request)
+        : await runCatastroTool(block.input);
       toolResults.push({
         type: "tool_result",
         tool_use_id: block.id,
@@ -1450,6 +1471,809 @@ async function transcribe(request, env, cfg, ctx, key) {
   return jsonOk({ text });
 }
 
+// ================= PDF generation =================
+// Everything from here to the end of the report section is the document
+// writer. It is inlined rather than imported because a Pages _worker.js is
+// one file; the source of record is pdfkit.js / memo.js in the deploy tree,
+// and mkfont.py builds the font tables it reads.
+
+// A PDF writer with no dependencies, small enough to live inside the Worker.
+//
+// Why hand-written: Cloudflare's HTML-to-PDF rendering needs the paid Workers
+// plan, and every JS PDF library assumes Node. What a memorandum actually
+// needs is narrow — text, rules, filled rectangles, tables — and PDF is a
+// plain text format, so the whole thing fits in a few hundred lines.
+//
+// The one genuinely hard part is fonts. The standard PDF fonts cannot render
+// Cyrillic at all, and half of Alla's readers write Russian. So the document
+// embeds a subset of Liberation Sans and addresses it through Identity-H,
+// where a string is a run of 2-byte glyph ids rather than characters. The
+// unicode-to-glyph and glyph-to-width tables are built offline (mkfont.py);
+// nothing here parses TrueType.
+
+const PT = 1;                    // PDF's unit is the point
+const A4 = { w: 595.28, h: 841.89 };
+
+// ---------- low-level object writer ----------
+
+class Out {
+  constructor() { this.parts = []; this.len = 0; }
+  raw(bytes) { this.parts.push(bytes); this.len += bytes.length; return this; }
+  str(s) {
+    // PDF syntax outside strings is ASCII; text is written as hex, so a
+    // byte-per-char encoding is correct here and avoids a TextEncoder pass.
+    const b = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xff;
+    return this.raw(b);
+  }
+  bytes() {
+    const all = new Uint8Array(this.len);
+    let at = 0;
+    for (const p of this.parts) { all.set(p, at); at += p.length; }
+    return all;
+  }
+}
+
+// A PDF string. Plain ASCII goes in parentheses with the two special
+// characters escaped; anything else becomes a UTF-16BE hex string, because a
+// literal string is bytes and a Cyrillic title written as bytes comes out of
+// a reader's Properties panel as mojibake.
+function pdfString(s) {
+  const str = String(s);
+  if (/^[\x20-\x7e]*$/.test(str)) {
+    return "(" + str.replace(/([\\()])/g, "\\$1") + ")";
+  }
+  let hex = "feff";
+  for (let i = 0; i < str.length; i++) {
+    hex += str.charCodeAt(i).toString(16).padStart(4, "0");
+  }
+  return "<" + hex + ">";
+}
+
+// ---------- fonts ----------
+
+// One embedded face. `map` is unicode -> glyph id, `widths` glyph id -> 1/1000
+// em, both from mkfont.py; `data` is the subset TTF.
+class Face {
+  constructor(name, table, data) {
+    this.name = name;
+    this.data = data;
+    this.metrics = table.metrics;
+    // Built once per isolate, not once per report. Turning the JSON into two
+    // Maps was most of the cost of generating a document, and the free plan
+    // allows ten milliseconds of CPU for the whole request.
+    if (!table._map) {
+      table._map = new Map();
+      for (const k in table.map) table._map.set(Number(k), table.map[k]);
+      table._widths = new Map();
+      for (const k in table.widths) table._widths.set(Number(k), table.widths[k]);
+    }
+    this.map = table._map;
+    this.widths = table._widths;
+    this.used = new Set();
+  }
+
+  // Unsupported characters become a space rather than a blank box: a report
+  // with one odd character in it should still be a readable report.
+  gid(cp) {
+    const g = this.map.get(cp);
+    if (g !== undefined) return g;
+    return this.map.get(32) || 0;
+  }
+
+  width(text, size) {
+    let w = 0;
+    for (const ch of String(text)) {
+      w += (this.widths.get(this.gid(ch.codePointAt(0))) || 0);
+    }
+    return w * size / 1000;
+  }
+
+  // The hex string a Tj operator takes, and a note of which glyphs the
+  // document actually used (so /W and /ToUnicode stay small).
+  encode(text) {
+    let hex = "";
+    for (const ch of String(text)) {
+      const g = this.gid(ch.codePointAt(0));
+      this.used.add(g);
+      hex += g.toString(16).padStart(4, "0");
+    }
+    return "<" + hex + ">";
+  }
+}
+
+// ---------- the page model ----------
+//
+// Content is accumulated per page as operator text. Nothing is measured
+// twice: the layout code below asks the Face for widths before it writes.
+
+class Page {
+  constructor(doc) {
+    this.doc = doc;
+    this.ops = [];
+  }
+  op(s) { this.ops.push(s); }
+
+  rect(x, y, w, h, color) {
+    this.op(`${rgb(color)} rg ${n(x)} ${n(y)} ${n(w)} ${n(h)} re f`);
+  }
+  line(x1, y1, x2, y2, color, width) {
+    this.op(`${rgb(color)} RG ${n(width || 0.6)} w ${n(x1)} ${n(y1)} m ${n(x2)} ${n(y2)} l S`);
+  }
+  text(str, x, y, face, size, color) {
+    const key = this.doc.fontKey(face);
+    this.op(`BT ${rgb(color)} rg /${key} ${n(size)} Tf 1 0 0 1 ${n(x)} ${n(y)} Tm ${face.encode(str)} Tj ET`);
+  }
+}
+
+function n(v) { return (Math.round(v * 100) / 100).toString(); }
+function rgb(c) {
+  const [r, g, b] = c || [0, 0, 0];
+  return `${n(r)} ${n(g)} ${n(b)}`;
+}
+
+// ---------- the document ----------
+
+class Doc {
+  constructor(opts) {
+    opts = opts || {};
+    this.size = opts.size || A4;
+    this.margin = opts.margin || { top: 64, right: 56, bottom: 64, left: 56 };
+    this.faces = opts.faces;            // { regular: Face, bold: Face }
+    this.pages = [];
+    this.page = null;
+    this.y = 0;
+    this.meta = opts.meta || {};
+    this.onPage = opts.onPage || null;  // header/footer painter
+    this.newPage();
+  }
+
+  get left() { return this.margin.left; }
+  get right() { return this.size.w - this.margin.right; }
+  get width() { return this.right - this.left; }
+
+  fontKey(face) { return face === this.faces.bold ? "F2" : "F1"; }
+
+  newPage() {
+    this.page = new Page(this);
+    this.pages.push(this.page);
+    this.y = this.size.h - this.margin.top;
+    if (this.onPage) this.onPage(this, this.pages.length);
+    return this.page;
+  }
+
+  // Everything that draws calls this first, so a block never straddles the
+  // bottom margin by accident.
+  need(h) {
+    if (this.y - h < this.margin.bottom) this.newPage();
+  }
+
+  gap(h) { this.y -= h; }
+
+  // ---- text ----
+
+  // Greedy wrap. Long unbreakable tokens (a URL, a cadastral reference) are
+  // split rather than allowed to run into the margin.
+  wrap(text, face, size, maxWidth) {
+    const lines = [];
+    for (const para of String(text).split("\n")) {
+      if (!para) { lines.push(""); continue; }
+      let line = "";
+      for (const word of para.split(/\s+/)) {
+        const probe = line ? line + " " + word : word;
+        if (face.width(probe, size) <= maxWidth) { line = probe; continue; }
+        if (line) { lines.push(line); line = ""; }
+        if (face.width(word, size) <= maxWidth) { line = word; continue; }
+        let chunk = "";
+        for (const ch of word) {
+          if (face.width(chunk + ch, size) > maxWidth) { lines.push(chunk); chunk = ""; }
+          chunk += ch;
+        }
+        line = chunk;
+      }
+      if (line) lines.push(line);
+    }
+    return lines;
+  }
+
+  para(text, o) {
+    o = o || {};
+    const face = o.bold ? this.faces.bold : this.faces.regular;
+    const size = o.size || 9.5;
+    const lead = o.lead || size * 1.45;
+    const color = o.color || [0.13, 0.13, 0.14];
+    const x0 = o.x !== undefined ? o.x : this.left;
+    const maxW = o.width || (this.right - x0);
+    const lines = this.wrap(text, face, size, maxW);
+    for (const line of lines) {
+      this.need(lead);
+      let x = x0;
+      if (o.align === "right") x = x0 + maxW - face.width(line, size);
+      else if (o.align === "center") x = x0 + (maxW - face.width(line, size)) / 2;
+      this.page.text(line, x, this.y - size, face, size, color);
+      this.y -= lead;
+    }
+    if (o.after) this.gap(o.after);
+    return lines.length;
+  }
+
+  heading(text, o) {
+    o = o || {};
+    const size = o.size || 13;
+    this.need(size * 2.2 + 10);
+    this.gap(o.before === undefined ? 14 : o.before);
+    this.para(text, { bold: true, size, color: o.color || [0.07, 0.09, 0.15], lead: size * 1.3 });
+    if (o.rule !== false) {
+      this.gap(3);
+      this.page.line(this.left, this.y, this.right, this.y, [0.85, 0.86, 0.88], 0.7);
+    }
+    this.gap(o.after === undefined ? 9 : o.after);
+  }
+
+  bullets(items, o) {
+    o = o || {};
+    const size = o.size || 9.5;
+    const indent = 12;
+    for (const item of items) {
+      this.need(size * 1.45);
+      const yTop = this.y;
+      this.page.text("•", this.left + 2, yTop - size, this.faces.regular, size, [0.45, 0.47, 0.5]);
+      this.para(item, { x: this.left + indent, width: this.width - indent, size, after: 2 });
+    }
+    if (o.after) this.gap(o.after);
+  }
+
+  // ---- tables ----
+  //
+  // cols: [{ head, width, align }]; rows: arrays of strings. A row that does
+  // not fit is moved whole to the next page, with the header repeated — a
+  // key-metrics table split across a page break is how reports lose readers.
+  table(cols, rows, o) {
+    o = o || {};
+    const size = o.size || 9;
+    const padX = 7, padY = 6;
+    const headBg = o.headBg || [0.95, 0.955, 0.97];
+    const lineCol = [0.87, 0.88, 0.90];
+
+    const total = cols.reduce((s, c) => s + c.width, 0);
+    const scale = this.width / total;
+    const w = cols.map((c) => c.width * scale);
+
+    const cellLines = (row) => cols.map((c, i) =>
+      this.wrap(row[i] === undefined || row[i] === null ? "" : String(row[i]),
+                row.bold ? this.faces.bold : this.faces.regular, size, w[i] - padX * 2));
+
+    const drawHead = () => {
+      const h = size * 1.35 + padY * 2;
+      this.need(h + 4);
+      this.page.rect(this.left, this.y - h, this.width, h, headBg);
+      let x = this.left;
+      cols.forEach((c, i) => {
+        const tx = c.align === "right" ? x + w[i] - padX - this.faces.bold.width(c.head, size) : x + padX;
+        this.page.text(c.head, tx, this.y - padY - size, this.faces.bold, size, [0.20, 0.22, 0.26]);
+        x += w[i];
+      });
+      this.y -= h;
+      this.page.line(this.left, this.y, this.right, this.y, lineCol, 0.7);
+    };
+
+    drawHead();
+
+    for (const row of rows) {
+      const lines = cellLines(row);
+      const rowH = Math.max(...lines.map((l) => l.length)) * size * 1.35 + padY * 2;
+      if (this.y - rowH < this.margin.bottom) { this.newPage(); drawHead(); }
+      if (row.shade) this.page.rect(this.left, this.y - rowH, this.width, rowH, row.shade);
+      let x = this.left;
+      const face = row.bold ? this.faces.bold : this.faces.regular;
+      cols.forEach((c, i) => {
+        let ty = this.y - padY - size;
+        for (const line of lines[i]) {
+          const tx = c.align === "right" ? x + w[i] - padX - face.width(line, size) : x + padX;
+          this.page.text(line, tx, ty, face, size, row.color || [0.13, 0.13, 0.14]);
+          ty -= size * 1.35;
+        }
+        x += w[i];
+      });
+      this.y -= rowH;
+      this.page.line(this.left, this.y, this.right, this.y, lineCol, 0.5);
+    }
+    if (o.after) this.gap(o.after);
+  }
+
+  // ---- serialisation ----
+
+  async build() {
+    const objects = [];                       // 1-based; objects[i] is object i+1
+    const add = (body) => { objects.push(body); return objects.length; };
+
+    const pageIds = [];
+    const contentIds = [];
+
+    // Fonts first: the page resources have to name them.
+    const fontIds = {};
+    for (const key of ["F1", "F2"]) {
+      const face = key === "F1" ? this.faces.regular : this.faces.bold;
+      fontIds[key] = this.emitFont(add, face, key);
+    }
+
+    const pagesId = objects.length + this.pages.length * 2 + 1;
+
+    for (const page of this.pages) {
+      const stream = page.ops.join("\n");
+      const cid = add(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+      contentIds.push(cid);
+      pageIds.push(add(
+        `<< /Type /Page /Parent ${pagesId} 0 R ` +
+        `/MediaBox [0 0 ${n(this.size.w)} ${n(this.size.h)}] ` +
+        `/Resources << /Font << /F1 ${fontIds.F1} 0 R /F2 ${fontIds.F2} 0 R >> >> ` +
+        `/Contents ${cid} 0 R >>`
+      ));
+    }
+
+    const realPagesId = add(
+      `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((i) => i + " 0 R").join(" ")}] >>`
+    );
+    // The page objects were written with a forward reference; it must land.
+    if (realPagesId !== pagesId) {
+      for (let i = 0; i < objects.length; i++) {
+        if (typeof objects[i] !== "string") continue;
+        objects[i] = objects[i].split(`/Parent ${pagesId} 0 R`).join(`/Parent ${realPagesId} 0 R`);
+      }
+    }
+
+    const m = this.meta;
+    const infoId = add(
+      `<< /Title ${pdfString(m.title || "Report")} /Author ${pdfString(m.author || "")} ` +
+      `/Subject ${pdfString(m.subject || "")} /Creator ${pdfString(m.creator || "Agent Alla")} ` +
+      `/CreationDate ${pdfString(pdfDate(m.date || new Date()))} >>`
+    );
+    const catalogId = add(`<< /Type /Catalog /Pages ${realPagesId} 0 R >>`);
+
+    // ---- assemble ----
+    const out = new Out();
+    out.str("%PDF-1.7\n%\xE2\xE3\xCF\xD3\n");
+    const offsets = [0];
+    for (let i = 0; i < objects.length; i++) {
+      offsets.push(out.len);
+      const body = objects[i];
+      if (typeof body === "string") {
+        out.str(`${i + 1} 0 obj\n${body}\nendobj\n`);
+      } else {
+        // A stream whose payload is binary (the embedded font). Written as
+        // bytes so that nothing in the path can reinterpret it as text.
+        out.str(`${i + 1} 0 obj\n${body.dict}\nstream\n`);
+        out.raw(body.data);
+        out.str("\nendstream\nendobj\n");
+      }
+    }
+    const xref = out.len;
+    out.str(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`);
+    for (let i = 1; i <= objects.length; i++) {
+      out.str(String(offsets[i]).padStart(10, "0") + " 00000 n \n");
+    }
+    out.str(
+      `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R /Info ${infoId} 0 R >>\n` +
+      `startxref\n${xref}\n%%EOF\n`
+    );
+    return out.bytes();
+  }
+
+  // A Type0/Identity-H font with its subset embedded, plus a ToUnicode map so
+  // the text can be selected, copied and searched — a report a bank cannot
+  // search is half a report.
+  emitFont(add, face, key) {
+    const used = [...face.used].sort((a, b) => a - b);
+    const widths = used.length
+      ? "[" + used.map((g) => `${g} [${face.widths.get(g) || 0}]`).join(" ") + "]"
+      : "[]";
+
+    const ttf = face.data;
+    const fileId = add({
+      dict: `<< /Length ${ttf.length} /Length1 ${ttf.length} >>`,
+      data: ttf,
+    });
+
+    const md = face.metrics;
+    const descId = add(
+      `<< /Type /FontDescriptor /FontName /${face.name} /Flags ${md.flags} ` +
+      `/FontBBox [${md.bbox.join(" ")}] /ItalicAngle ${md.italicAngle} ` +
+      `/Ascent ${md.ascent} /Descent ${md.descent} /CapHeight ${md.capHeight} ` +
+      `/StemV ${md.stemV} /FontFile2 ${fileId} 0 R >>`
+    );
+    const cidId = add(
+      `<< /Type /Font /Subtype /CIDFontType2 /BaseFont /${face.name} ` +
+      `/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> ` +
+      `/FontDescriptor ${descId} 0 R /DW 1000 /W ${widths} /CIDToGIDMap /Identity >>`
+    );
+
+    const toUni = toUnicodeCMap(face, used);
+    const uniId = add(`<< /Length ${toUni.length} >>\nstream\n${toUni}\nendstream`);
+
+    return add(
+      `<< /Type /Font /Subtype /Type0 /BaseFont /${face.name} /Encoding /Identity-H ` +
+      `/DescendantFonts [${cidId} 0 R] /ToUnicode ${uniId} 0 R >>`
+    );
+  }
+}
+
+function pdfDate(d) {
+  const p = (v) => String(v).padStart(2, "0");
+  return `D:${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}` +
+         `${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
+}
+
+function toUnicodeCMap(face, used) {
+  const back = new Map();
+  for (const [cp, gid] of face.map) if (!back.has(gid)) back.set(gid, cp);
+  const rows = used.filter((g) => back.has(g))
+    .map((g) => `<${g.toString(16).padStart(4, "0")}> <${back.get(g).toString(16).padStart(4, "0")}>`);
+  const chunks = [];
+  for (let i = 0; i < rows.length; i += 100) {
+    const part = rows.slice(i, i + 100);
+    chunks.push(`${part.length} beginbfchar\n${part.join("\n")}\nendbfchar`);
+  }
+  return [
+    "/CIDInit /ProcSet findresource begin",
+    "12 dict begin begincmap",
+    "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def",
+    "/CMapName /Adobe-Identity-UCS def /CMapType 2 def",
+    "1 begincodespacerange <0000> <FFFF> endcodespacerange",
+    ...chunks,
+    "endcmap CMapName currentdict /CMap defineresource pop end end",
+  ].join("\n");
+}
+
+// The ROILITY investment memorandum, as a layout.
+//
+// The structure is the one approved on the Son Remei report and recorded in
+// layer-1-core-identity.md: cover, then Executive Summary with the key
+// metrics table first, then the sections in a fixed order. Alla supplies the
+// content as data; nothing here invents a number, and a section she has no
+// material for is simply absent rather than padded.
+
+
+const INK = [0.11, 0.12, 0.15];
+const MUTED = [0.42, 0.45, 0.50];
+const ACCENT = [0.10, 0.28, 0.45];
+const RULE = [0.85, 0.86, 0.88];
+const BAND = [0.96, 0.965, 0.975];
+
+// Every section Alla can fill, in the order they must appear. `key` is what
+// she puts in the tool call; `title` is the fallback heading.
+const SECTIONS = [
+  ["executive_summary", "Executive Summary"],
+  ["asset_description", "Asset Description"],
+  ["acquisition_cost", "Acquisition Cost"],
+  ["construction_budget", "Construction Budget"],
+  ["timeline", "Timeline"],
+  ["market_comparables", "Market Comparables"],
+  ["profitability", "Profitability Scenarios"],
+  ["risks", "Risks and Open Items — Pending Due Diligence"],
+];
+
+function cover(doc, d) {
+  const page = doc.page;
+  const { w, h } = doc.size;
+
+  page.rect(0, h - 210, w, 210, [0.07, 0.11, 0.18]);
+  page.text(d.firm || "ROILITY S.L.", doc.left, h - 96, doc.faces.bold, 22, [1, 1, 1]);
+  page.text(d.firmLine || "Real Estate Investment & Development — Balearic Islands",
+            doc.left, h - 120, doc.faces.regular, 10, [0.72, 0.78, 0.86]);
+
+  doc.y = h - 290;
+  doc.para(d.title || "Investment Memorandum",
+           { bold: true, size: 26, lead: 31, color: INK });
+  if (d.property) {
+    doc.gap(6);
+    doc.para(d.property, { size: 13, lead: 18, color: MUTED });
+  }
+
+  doc.gap(26);
+  page.line(doc.left, doc.y, doc.left + 90, doc.y, ACCENT, 2.2);
+  doc.gap(26);
+
+  // The facing table: the four or five numbers a reader wants before they
+  // decide whether to read the rest.
+  if (d.headline && d.headline.length) {
+    doc.table(
+      [{ head: d.headlineHead ? d.headlineHead[0] : "Key figure", width: 60 },
+       { head: d.headlineHead ? d.headlineHead[1] : "Value", width: 40, align: "right" }],
+      d.headline.map((r) => Object.assign([r[0], r[1]], { bold: r[2] === true })),
+      { after: 22 }
+    );
+  }
+
+  if (d.preparedFor) {
+    doc.para(d.preparedFor, { size: 9.5, color: MUTED, after: 4 });
+  }
+
+  // Anchored to the bottom of the cover, not to the flow: the notice has a
+  // fixed place on every report so a reader learns where to find it.
+  const y = 118;
+  page.line(doc.left, y + 40, doc.right, y + 40, RULE, 0.7);
+  page.text(d.confidentialTitle || "CONFIDENTIAL", doc.left, y + 22, doc.faces.bold, 9, INK);
+  const saveY = doc.y;
+  doc.y = y + 12;
+  doc.para(d.confidential ||
+    "This document is confidential and prepared for the named recipient only. " +
+    "It is not an offer, a valuation, or investment advice.",
+    { size: 8, lead: 10.5, color: MUTED });
+  doc.y = saveY;
+
+  doc.newPage();
+}
+
+// A section is text, bullets, a table, or any combination — whatever Alla
+// actually has for it.
+function section(doc, heading, body) {
+  if (!body) return;
+  const has = body.text || (body.bullets && body.bullets.length) ||
+              (body.table && body.table.rows && body.table.rows.length);
+  if (!has) return;
+
+  doc.heading(heading);
+  if (body.text) doc.para(body.text, { after: body.bullets || body.table ? 8 : 4 });
+  if (body.bullets && body.bullets.length) doc.bullets(body.bullets, { after: body.table ? 8 : 2 });
+  if (body.table && body.table.rows && body.table.rows.length) {
+    const cols = (body.table.cols || []).map((c, i) => ({
+      head: typeof c === "string" ? c : c.head,
+      width: typeof c === "string" ? (i === 0 ? 52 : 48 / Math.max(1, (body.table.cols.length - 1))) : (c.width || 25),
+      align: typeof c === "string" ? (i === 0 ? "left" : "right") : (c.align || "right"),
+    }));
+    doc.table(cols, body.table.rows.map((r) => {
+      const row = Array.isArray(r) ? r.slice() : (r.cells || []).slice();
+      if (!Array.isArray(r) && r.total) { row.bold = true; row.shade = BAND; }
+      return row;
+    }), { after: 6 });
+    if (body.table.note) {
+      doc.para(body.table.note, { size: 8, color: MUTED, after: 4 });
+    }
+  }
+}
+
+async function renderMemorandum(faces, data) {
+  const doc = new Doc({
+    size: A4,
+    faces,
+    meta: {
+      title: data.title || "Investment Memorandum",
+      author: data.firm || "ROILITY S.L.",
+      subject: data.property || "",
+      creator: "Agent Alla",
+      date: new Date(),
+    },
+    onPage(d, pageNo) {
+      if (pageNo === 1) return;          // the cover carries no furniture
+      const { w, h } = d.size;
+      d.page.text(data.firm || "ROILITY S.L.", d.left, h - 40, d.faces.bold, 8, MUTED);
+      if (data.property) {
+        const t = data.property;
+        d.page.text(t, d.right - d.faces.regular.width(t, 8), h - 40, d.faces.regular, 8, MUTED);
+      }
+      d.page.line(d.left, h - 50, d.right, h - 50, RULE, 0.6);
+      const no = String(pageNo);
+      d.page.text(no, w / 2 - d.faces.regular.width(no, 8) / 2, 40, d.faces.regular, 8, MUTED);
+      if (data.footer) d.page.text(data.footer, d.left, 40, d.faces.regular, 7.5, MUTED);
+    },
+  });
+
+  cover(doc, data);
+
+  const sections = data.sections || {};
+  for (const [key, fallback] of SECTIONS) {
+    section(doc, (sections[key] && sections[key].heading) || fallback, sections[key]);
+  }
+  for (const extra of data.extraSections || []) {
+    section(doc, extra.heading, extra);
+  }
+
+  doc.heading(data.legalHeading || "Legal Notice");
+  doc.para(data.legal ||
+    "Figures in this memorandum are drawn from the sources named beside them and " +
+    "have not been independently verified. Asking prices are not transaction " +
+    "prices. Nothing here is a valuation, a tax opinion, or investment advice, " +
+    "and no decision should be taken on it without professional review.",
+    { size: 8.5, lead: 11.5, color: MUTED });
+
+  return doc.build();
+}
+
+
+// ---------- reports ----------
+//
+// Alla writes memoranda for real: she calls property_report with the content
+// she has gathered, the Worker lays it out as a PDF, puts it in R2 and hands
+// back a link. Nothing about the layout is hers to invent — the structure is
+// the ROILITY house style, fixed — and nothing about the content is the
+// Worker's: a section she has no material for simply does not appear.
+
+const REPORT_TTL_DAYS = 90;
+
+// The fonts are static assets of this same site. Fetched once per isolate;
+// the parsed lookup tables are cached inside the Face objects.
+let FONT_CACHE = null;
+
+async function loadFaces(env, request) {
+  if (FONT_CACHE) {
+    return {
+      regular: new Face("LiberationSans", FONT_CACHE.tables.regular, FONT_CACHE.regular),
+      bold: new Face("LiberationSans-Bold", FONT_CACHE.tables.bold, FONT_CACHE.bold),
+    };
+  }
+  const base = new URL(request.url);
+  const get = async (path) => {
+    const res = await env.ASSETS.fetch(new Request(new URL(path, base).toString()));
+    if (!res.ok) throw new Error("font_missing:" + path);
+    return res;
+  };
+  const [tablesRes, regRes, boldRes] = await Promise.all([
+    get("/assets/pdf/fonts.json"),
+    get("/assets/pdf/ls-regular.ttf"),
+    get("/assets/pdf/ls-bold.ttf"),
+  ]);
+  FONT_CACHE = {
+    tables: await tablesRes.json(),
+    regular: new Uint8Array(await regRes.arrayBuffer()),
+    bold: new Uint8Array(await boldRes.arrayBuffer()),
+  };
+  return loadFaces(env, request);
+}
+
+const REPORT_TOOL = {
+  name: "property_report",
+  description:
+    "Produces a finished PDF memorandum in the ROILITY house style and returns a " +
+    "link the person can open and forward. Use it when someone asks for a report, " +
+    "memorandum, informe, dossier or 'send me this as a PDF' about a property or a " +
+    "deal — not for an ordinary answer in the chat. Write EVERY heading, label and " +
+    "sentence in the language the person is using. Put only figures you actually " +
+    "have into it: each section is optional and an absent section is better than a " +
+    "padded one, and where a number came from a listing or a register, say so in " +
+    "the row's own source column. Keep it tight — the house style is a short " +
+    "document whose key metrics are on the cover.",
+  input_schema: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "Document title, in the person's language." },
+      property: { type: "string", description: "One line identifying the property: place, and the listing or cadastral reference if known." },
+      prepared_for: { type: "string", description: "Who it is prepared for, and the date." },
+      headline: {
+        type: "array",
+        description: "The three to six figures that belong on the cover. Each is [label, value] and optionally a third element true to emphasise the row.",
+        items: { type: "array", items: { type: "string" } },
+      },
+      headline_head: {
+        type: "array",
+        description: "Column headings for the cover table, in the person's language, e.g. ['Показатель','Значение'].",
+        items: { type: "string" },
+      },
+      sections: {
+        type: "object",
+        description: "Any of: executive_summary, asset_description, acquisition_cost, construction_budget, timeline, market_comparables, profitability, risks. Each may carry a heading (in the person's language), text, bullets and one table.",
+        additionalProperties: {
+          type: "object",
+          properties: {
+            heading: { type: "string" },
+            text: { type: "string" },
+            bullets: { type: "array", items: { type: "string" } },
+            table: {
+              type: "object",
+              properties: {
+                cols: { type: "array", items: { type: "string" } },
+                rows: {
+                  type: "array",
+                  description: "Rows of cells. A totals row may be given as {\"cells\":[...],\"total\":true}.",
+                  items: {},
+                },
+                note: { type: "string", description: "A caveat printed under the table." },
+              },
+            },
+          },
+        },
+      },
+      legal_heading: { type: "string" },
+      legal: { type: "string", description: "The closing notice, in the person's language." },
+      confidential: { type: "string", description: "The confidentiality line for the cover, in the person's language." },
+    },
+    required: ["title", "property"],
+  },
+};
+
+function looksLikeReportRequest(text) {
+  if (!text) return false;
+  return /\b(memorand|report|dossier|informe|memoria|relat[óo]rio)\w*\b/i.test(text)
+      || /\bpdf\b/i.test(text)
+      || /меморандум|отч[её]т|справк[ауи]|документ\w*\s+(по|на)\b/i.test(text);
+}
+
+async function runReportTool(input, env, request) {
+  if (!env.REPORTS || typeof env.REPORTS.put !== "function") {
+    // Said plainly so Alla tells the person the truth rather than promising a
+    // file that will never arrive.
+    return { ok: false, error: "report_storage_unavailable",
+             message: "Report storage is not configured, so no PDF can be produced right now." };
+  }
+
+  let faces;
+  try {
+    faces = await loadFaces(env, request);
+  } catch (e) {
+    return { ok: false, error: "fonts_unavailable", message: String(e.message || e) };
+  }
+
+  const data = {
+    firm: "ROILITY S.L.",
+    firmLine: "Real Estate Investment & Development — Balearic Islands",
+    title: input.title,
+    property: input.property,
+    preparedFor: input.prepared_for,
+    footer: "ROILITY S.L. · agentalla.com",
+    headline: Array.isArray(input.headline) ? input.headline : [],
+    headlineHead: Array.isArray(input.headline_head) ? input.headline_head : null,
+    sections: input.sections || {},
+    legalHeading: input.legal_heading,
+    legal: input.legal,
+    confidential: input.confidential,
+  };
+
+  let bytes;
+  try {
+    bytes = await renderMemorandum(faces, data);
+  } catch (e) {
+    return { ok: false, error: "render_failed", message: String(e.message || e) };
+  }
+
+  // A 128-bit name is the access control: the link is unguessable, and it is
+  // the person's to forward or not. It also expires.
+  const raw = crypto.getRandomValues(new Uint8Array(16));
+  const id = [...raw].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const expires = nowSec() + REPORT_TTL_DAYS * 86400;
+
+  try {
+    await env.REPORTS.put("reports/" + id + ".pdf", bytes, {
+      httpMetadata: { contentType: "application/pdf" },
+      customMetadata: { expires: String(expires), title: input.title || "" },
+    });
+  } catch (e) {
+    return { ok: false, error: "store_failed", message: String(e.message || e) };
+  }
+
+  const url = new URL("/r/" + id, request.url).toString();
+  return {
+    ok: true,
+    url,
+    bytes: bytes.length,
+    expires_days: REPORT_TTL_DAYS,
+    note: "Give the person this link as it is. It opens the PDF in a browser and can be forwarded; it stops working after " + REPORT_TTL_DAYS + " days.",
+  };
+}
+
+async function serveReport(id, env) {
+  if (!env.REPORTS || typeof env.REPORTS.get !== "function") return jsonError(404, "not_found");
+  if (!/^[0-9a-f]{32}$/.test(id)) return jsonError(404, "not_found");
+  let obj;
+  try { obj = await env.REPORTS.get("reports/" + id + ".pdf"); } catch (e) { obj = null; }
+  if (!obj) return jsonError(404, "not_found");
+
+  const meta = obj.customMetadata || {};
+  if (meta.expires && Number(meta.expires) < nowSec()) {
+    return jsonError(410, "report_expired");
+  }
+  return new Response(obj.body, {
+    status: 200,
+    headers: {
+      "content-type": "application/pdf",
+      "content-disposition": 'inline; filename="' +
+        (meta.title ? meta.title.replace(/[^\w .\-]+/g, "_").slice(0, 60) : "report") + '.pdf"',
+      // The link is the secret; nothing else should hold a copy of it.
+      "cache-control": "private, max-age=600",
+      "x-robots-tag": "noindex, nofollow",
+    },
+  });
+}
+
+
 // Watches the SSE stream on its way to the browser and pulls the real token
 // counts out of it (message_start carries input, message_delta carries
 // output). The bytes are passed through untouched.
@@ -1811,6 +2635,15 @@ export default {
       const handled = await routeBilling(request, env, url, cfg);
       if (handled) return handled;
       return jsonError(404, "not_found");
+    }
+
+    // A report link. Unguessable by its name, expiring by its metadata, and
+    // never listed anywhere — the person decides who else sees it.
+    if (url.pathname.startsWith("/r/")) {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return jsonError(405, "method_not_allowed");
+      }
+      return serveReport(url.pathname.slice(3), env);
     }
 
     if (url.pathname === "/api/transcribe") {
