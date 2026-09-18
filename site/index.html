@@ -4633,7 +4633,7 @@
     }
 
     async function start() {
-      if (state !== "idle" || busy) return;
+      if (state !== "idle") return;
       discard = false;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -4691,7 +4691,14 @@
       releaseStream();
 
       if (discard) { reset(); return; }
-      if (!blob || blob.size < 1024 || elapsedMs < MIN_MS) { reset(); return; }
+      // Nothing worth sending. This used to return in silence, which is
+      // indistinguishable from a broken microphone — and that is exactly what
+      // it kept getting reported as. Say something instead.
+      if (!blob || blob.size < 1024 || elapsedMs < MIN_MS) {
+        addMessage("system", T.micErrorNoSpeech);
+        reset();
+        return;
+      }
       if (elapsedMs > (MAX_SECONDS + 5) * 1000) {
         addMessage("system", T.micErrorTooLong);
         reset();
@@ -4747,7 +4754,18 @@
       var typed = inputEl.value.trim();
       inputEl.value = typed ? typed + " " + text : text;
       autoGrow();
-      send();
+
+      // send() refuses while an answer is still streaming. Calling it anyway
+      // left the transcribed sentence sitting in the box, unsent and unex-
+      // plained — the person dictated, saw their words appear, and nothing
+      // happened. Wait for the answer to finish, then send it.
+      if (!busy) { send(); return; }
+      var waited = 0;
+      var pending = setInterval(function () {
+        waited += 200;
+        if (!busy) { clearInterval(pending); send(); }
+        else if (waited > 120000) clearInterval(pending);   // give up, text stays in the box
+      }, 200);
     }
 
     document.addEventListener("visibilitychange", function () {
@@ -4758,7 +4776,10 @@
     setState("idle");
 
     micBtn.addEventListener("click", function () {
-      if (busy && state !== "recording") return;
+      // Recording no longer waits for Alla to finish answering. Refusing the
+      // click while she was still typing made the button look dead at the
+      // exact moment people reach for it — the transcript is held and sent
+      // when the answer completes (see onStopped).
       if (state === "recording") stop();
       else if (state === "idle") start();
     });
