@@ -469,8 +469,26 @@
     .composer { padding: 10px; }
   }
 
+  /* Four round buttons plus a usable text area do not fit a phone. The
+     buttons get smaller, and the expand control goes away entirely: on a
+     phone the chat already grows with the conversation by itself, so it was
+     the one button worth losing to keep the other three tappable. */
+  @media (max-width: 480px) {
+    .composer { gap: 6px; }
+    .input-pill { padding-left: 12px; }
+    .pill-actions { gap: 1px; }
+    .icon-btn { width: 34px; height: 34px; }
+    #expand { display: none; }
+  }
+
   .input-pill {
     flex: 1;
+    /* Without this the pill is a flex item with min-width:auto, so it refuses
+       to shrink below the width of its own contents — and once the paperclip
+       made that four buttons instead of three, the microphone and the send
+       button were pushed past the right edge of a phone screen and could not
+       be tapped at all. The text area (min-width:0, below) gives way instead. */
+    min-width: 0;
     display: flex;
     align-items: flex-end;
     gap: 4px;
@@ -3673,6 +3691,7 @@
       micErrorTooLong: 'That recording was too long — keep it under two minutes.',
       micErrorRateLimited: 'Too many voice messages in a row — try again in a few minutes.',
       micErrorNoSpeech: 'Alla didn\'t catch any speech — try again, a bit closer to the microphone.',
+      micErrorService: 'Speech recognition is unavailable right now — this is on our side, not yours. Please type instead.',
       whyH2: 'What actually changes for your business',
       whyPrevLabel: 'Previous', whyNextLabel: 'Next',
       card1Title: 'Investment-analyst depth, not listing descriptions',
@@ -3739,6 +3758,7 @@
       micErrorTooLong: 'La grabación fue demasiado larga — no superes los dos minutos.',
       micErrorRateLimited: 'Demasiados mensajes de voz seguidos — inténtalo de nuevo en unos minutos.',
       micErrorNoSpeech: 'Alla no captó ninguna voz — inténtalo otra vez, más cerca del micrófono.',
+      micErrorService: 'El reconocimiento de voz no está disponible ahora mismo — es cosa nuestra, no tuya. Escribe tu mensaje, por favor.',
       whyH2: 'Lo que realmente cambia para tu negocio',
       whyPrevLabel: 'Anterior', whyNextLabel: 'Siguiente',
       card1Title: 'Profundidad de analista de inversión, no descripciones de anuncio',
@@ -3805,6 +3825,7 @@
       micErrorTooLong: 'Запись слишком длинная — уложитесь в две минуты.',
       micErrorRateLimited: 'Слишком много голосовых подряд — попробуйте через несколько минут.',
       micErrorNoSpeech: 'Алла не расслышала речь — попробуйте ещё раз, ближе к микрофону.',
+      micErrorService: 'Распознавание речи сейчас недоступно — это на нашей стороне, не у вас. Напишите сообщение текстом.',
       whyH2: 'Что реально меняется для вашего бизнеса',
       whyPrevLabel: 'Назад', whyNextLabel: 'Вперёд',
       card1Title: 'Глубина инвестиционного аналитика, а не описание объявления',
@@ -3871,6 +3892,7 @@
       micErrorTooLong: 'Die Aufnahme war zu lang — bitte unter zwei Minuten bleiben.',
       micErrorRateLimited: 'Zu viele Sprachnachrichten hintereinander — bitte in ein paar Minuten erneut versuchen.',
       micErrorNoSpeech: 'Alla hat keine Sprache gehört — bitte noch einmal, näher am Mikrofon.',
+      micErrorService: 'Die Spracherkennung ist gerade nicht verfügbar — das liegt an uns, nicht an Ihnen. Bitte tippen Sie Ihre Nachricht.',
       whyH2: 'Was sich für Ihr Geschäft wirklich ändert',
       whyPrevLabel: 'Zurück', whyNextLabel: 'Weiter',
       card1Title: 'Tiefe eines Investmentanalysten, keine Anzeigenbeschreibung',
@@ -3937,6 +3959,7 @@
       micErrorTooLong: 'Enregistrement trop long — restez sous deux minutes.',
       micErrorRateLimited: 'Trop de messages vocaux d\'affilée — réessayez dans quelques minutes.',
       micErrorNoSpeech: 'Alla n\'a rien entendu — réessayez, plus près du micro.',
+      micErrorService: "La reconnaissance vocale est indisponible pour le moment — cela vient de nous, pas de vous. Écrivez votre message.",
       whyH2: 'Ce qui change réellement pour votre activité',
       whyPrevLabel: 'Précédent', whyNextLabel: 'Suivant',
       card1Title: "Profondeur d'analyste en investissement, pas une description d'annonce",
@@ -4003,6 +4026,7 @@
       micErrorTooLong: 'A gravação foi longa demais — fique abaixo de dois minutos.',
       micErrorRateLimited: 'Demasiadas mensagens de voz seguidas — tente novamente daqui a alguns minutos.',
       micErrorNoSpeech: 'A Alla não captou nenhuma fala — tente de novo, mais perto do microfone.',
+      micErrorService: 'O reconhecimento de voz está indisponível de momento — o problema é nosso, não seu. Escreva a sua mensagem.',
       whyH2: 'O que realmente muda para o seu negócio',
       whyPrevLabel: 'Anterior', whyNextLabel: 'Seguinte',
       card1Title: 'Profundidade de analista de investimento, não descrições de anúncio',
@@ -4069,6 +4093,7 @@
       micErrorTooLong: 'Registrazione troppo lunga — resta sotto i due minuti.',
       micErrorRateLimited: 'Troppi messaggi vocali di fila — riprova tra qualche minuto.',
       micErrorNoSpeech: 'Alla non ha sentito parlato — riprova, più vicino al microfono.',
+      micErrorService: 'Il riconoscimento vocale non è disponibile al momento — dipende da noi, non da te. Scrivi pure il messaggio.',
       whyH2: 'Cosa cambia davvero per la tua attività',
       whyPrevLabel: 'Precedente', whyNextLabel: 'Successivo',
       card1Title: 'Profondità da analista di investimento, non descrizioni da annuncio',
@@ -4686,12 +4711,21 @@
           body: blob
         });
         if (!res.ok) {
-          var code = "";
-          try { code = (await res.json()).error || ""; } catch (e) {}
+          var body = {};
+          try { body = await res.json(); } catch (e) {}
+          var code = body.error || "";
+          // Printed so that a report of "the microphone is broken" can be
+          // turned into a cause in one glance at the console, from any device.
+          try { console.warn("[alla] transcribe", res.status, JSON.stringify(body)); } catch (e) {}
           addMessage("system",
             code === "transcribe_rate_limited" ? T.micErrorRateLimited :
             code === "audio_too_long" || code === "audio_too_large" ? T.micErrorTooLong :
             code === "audio_type_unsupported" ? T.micErrorUnsupported :
+            // Everything left is the service, not the person: no key, no
+            // credit, OpenAI down. Saying "try typing" and nothing else sent
+            // him hunting through browser permissions for an hour.
+            code === "transcribe_failed" || code === "transcribe_exception" ||
+            code === "transcribe_not_configured" ? T.micErrorService :
             T.micErrorGeneric);
           reset();
           return;

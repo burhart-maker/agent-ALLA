@@ -12,7 +12,7 @@
 //     quietly refreshed in the background for next time.
 //
 // Bump CACHE_VERSION whenever the precached shell changes.
-const CACHE_VERSION = "alla-v2";
+const CACHE_VERSION = "alla-v3";
 const SHELL_CACHE = CACHE_VERSION + "-shell";
 const RUNTIME_CACHE = CACHE_VERSION + "-runtime";
 

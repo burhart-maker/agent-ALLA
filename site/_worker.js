@@ -208,6 +208,20 @@ const CORE_INSTRUCTIONS = [
   "Consejo General del Notariado) are registered transaction values that lag by ",
   "months. Say which you are using, from when, and how the two differ, and never ",
   "present an asking price as a sale price.\n\n",
+  "Portal listings: when the person gives you an idealista link or listing ",
+  "number and you have an idealista tool available, READ THE LISTING WITH IT ",
+  "before saying anything about the property. It returns the asking price, ",
+  "built and usable area, plot size, rooms, condition, energy certificate, ",
+  "every photograph and floor plan, and the selling agency with its phone — so ",
+  "work from that record and describe what is actually in it. Never ask the ",
+  "person to paste the text of the advert or to send you a screenshot of it. ",
+  "If no idealista tool is offered on this turn, say plainly that you cannot ",
+  "open the listing right now and ask for the two or three figures you need ",
+  "(price, surface, municipality) — do not pretend to have read it, and do not ",
+  "invent details that look like they came from the advert. Remember that a ",
+  "listing is the seller's own description: the surface, the licence status and ",
+  "the condition are claims until the cadastre or the register confirms them, ",
+  "so check the reference with catastro_lookup when the answer depends on it.\n\n",
   "Use both live tools together where the question deserves it: catastro_lookup ",
   "for what the property legally IS (reference, surfaces, use class, year), ",
   "web_search for everything around it that moves the result — the current ",
@@ -383,6 +397,84 @@ function looksLikeCadastreQuery(text) {
   // answer came from the model's guesswork instead of the register.
   return /catastr|referencia\s+catastral|idealista\.[a-z]+\/inmueble|\bparcela\b|\bsolar\b|\bfinca\b|edificabilidad|urban[ií]stic|cadastral|cadastre/i.test(t)
       || /кадастр|участ[ое]к|парцел|надел|застро[ий]|урбанист|землевладен|межеван/i.test(t);
+}
+
+// ---------- idealista listings ----------
+//
+// A listing link pasted into the chat used to end in "I can't open that, send
+// me a screenshot" — the single most embarrassing thing an estate agent can
+// say. The portal publishes an MCP endpoint (the one behind their own ChatGPT
+// app) that needs no key and returns the whole record: price, built and usable
+// area, plot, rooms, energy certificate, every photo and floor plan, the
+// agency and its phone. Anthropic's API can call that endpoint itself, so the
+// Worker only has to name it — see the mcp_servers block in handleChatPost.
+
+// Tried in order when the address is not yet in settings. Each is a POST that
+// costs nothing when it fails, and the winner is written to the settings table
+// so the probe runs once, not once per message.
+const IDEALISTA_MCP_CANDIDATES = [
+  "https://mcp.idealista.com/mcp",
+  "https://mcp.idealista.com/",
+  "https://www.idealista.com/mcp",
+  "https://api.idealista.com/mcp"
+];
+
+const IDEALISTA_PROBE_EVERY = 86400;   // a failed sweep is not repeated for a day
+
+// An idealista URL, a bare listing code next to the portal's name, or a plain
+// request to look at "the listing". Deliberately narrow: this only decides
+// whether to hand Anthropic one extra server to call.
+function looksLikeListingQuery(text) {
+  if (!text) return false;
+  return /idealista\.(com|it|pt)/i.test(text)
+      || /\b(inmueble|immobile|imovel|im[oó]vel)\/\d{6,}/i.test(text);
+}
+
+// MCP's initialize handshake, nothing more. A server that answers this is the
+// right address; anything else (404, HTML, a timeout) is not.
+async function idealistaProbe(url) {
+  const body = JSON.stringify({
+    jsonrpc: "2.0", id: 1, method: "initialize",
+    params: {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "agentalla", version: "1" }
+    }
+  });
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+    body
+  });
+  if (!res.ok) return false;
+  const text = (await res.text()).slice(0, 4000);
+  return text.indexOf("protocolVersion") !== -1 || text.indexOf("serverInfo") !== -1;
+}
+
+// Finds the endpoint once and remembers it. Returns "" when nothing answered,
+// which simply means Alla answers about listings the way she does today.
+async function discoverIdealista(env, cfg) {
+  if (cfg.idealistaMcpUrl) return cfg.idealistaMcpUrl;
+  if (!hasDB(env)) return "";
+  if (nowSec() - (cfg.idealistaProbedAt || 0) < IDEALISTA_PROBE_EVERY) return "";
+
+  let found = "";
+  for (const url of IDEALISTA_MCP_CANDIDATES) {
+    try { if (await idealistaProbe(url)) { found = url; break; } } catch (e) { /* next */ }
+  }
+  try {
+    await env.DB.prepare(
+      "INSERT INTO settings (key, value) VALUES ('idealista_probed_at', ?) " +
+      "ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+    ).bind(String(nowSec())).run();
+    if (found) {
+      await env.DB.prepare(
+        "INSERT INTO settings (key, value) VALUES ('idealista_mcp_url', ?) " +
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+      ).bind(found).run();
+    }
+  } catch (e) { /* discovery must never break a message */ }
+  return found;
 }
 
 // One request to a coordinates service. Tries the JSON endpoint and falls
@@ -663,7 +755,8 @@ function attachFiles(cleaned, raw) {
   return jsonError(400, "invalid_history");
 }
 
-async function handleChatPost(request, env) {
+async function handleChatPost(request, env, cfg) {
+  cfg = cfg || {};
   if (!env.ANTHROPIC_API_KEY) {
     return jsonError(500, "server_not_configured");
   }
@@ -704,6 +797,47 @@ async function handleChatPost(request, env) {
   const lastUserMessage = [...cleaned].reverse().find((m) => m.role === "user");
   const useCadastreTool = looksLikeCadastreQuery(lastUserMessage && lastUserMessage.content);
 
+  // Only a turn that actually mentions a listing gets the extra server. It is
+  // attached to whichever path the turn was already taking, and askAnthropic()
+  // drops it and retries once if the API will not take it — a listing link
+  // must never be the reason an ordinary answer fails.
+  const listingUrl = looksLikeListingQuery(lastUserMessage && lastUserMessage.content)
+    ? await discoverIdealista(env, cfg)
+    : "";
+  const mcpServers = listingUrl
+    ? [{ type: "url", url: listingUrl, name: "idealista" }]
+    : null;
+
+  async function askAnthropic(payload) {
+    const headers = {
+      "content-type": "application/json",
+      "x-api-key": env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    };
+    if (mcpServers) {
+      headers["anthropic-beta"] = "mcp-client-2025-04-04";
+      payload = Object.assign({}, payload, { mcp_servers: mcpServers });
+    }
+    let res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST", headers, body: JSON.stringify(payload)
+    });
+    if (!res.ok && mcpServers && res.status >= 400 && res.status < 500) {
+      // The endpoint was refused (wrong address, beta withdrawn, server down).
+      // Ask again without it rather than failing the person's message.
+      const bare = Object.assign({}, payload);
+      delete bare.mcp_servers;
+      const plain = {
+        "content-type": "application/json",
+        "x-api-key": env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      };
+      res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", headers: plain, body: JSON.stringify(bare)
+      });
+    }
+    return res;
+  }
+
   // After the cadastre check, which needs plain text: this turns the newest
   // user message's content into blocks.
   const attachError = attachFiles(cleaned, body && body.attachments);
@@ -715,14 +849,7 @@ async function handleChatPost(request, env) {
     // advice, no specific parcel/address) keeps its original low latency.
     let anthropicRes;
     try {
-      anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
+      anthropicRes = await askAnthropic({
           model,
           max_tokens: MAX_TOKENS,
           system: SYSTEM_PROMPT,
@@ -735,7 +862,6 @@ async function handleChatPost(request, env) {
           // questions take the tool path below instead.
           tools: [WEB_SEARCH_TOOL],
           messages: cleaned
-        })
       });
     } catch (e) {
       return jsonError(502, "upstream_unreachable");
@@ -776,14 +902,7 @@ async function handleChatPost(request, env) {
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     let res;
     try {
-      res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
+      res = await askAnthropic({
           model,
           max_tokens: MAX_TOKENS,
           system: SYSTEM_PROMPT,
@@ -793,7 +912,6 @@ async function handleChatPost(request, env) {
           // execute catastro_lookup itself.
           tools: [CATASTRO_TOOL, WEB_SEARCH_TOOL],
           messages
-        })
       });
     } catch (e) {
       return jsonError(502, "upstream_unreachable");
@@ -950,6 +1068,13 @@ async function loadSettings(env) {
     transcribeMaxSeconds: num("transcribe_max_seconds", 120),
     transcribeMaxBytes: num("transcribe_max_bytes", 8000000),
     transcribeMaxPerHour: num("transcribe_max_per_hour", 40),
+    // The portal's own MCP endpoint — the same one behind their ChatGPT app,
+    // and authless. A settings row rather than a constant because the address
+    // is not published anywhere: the moment it is known it can be set here
+    // and listings start working, with no deploy. Empty means "not known yet",
+    // and then discoverIdealista() goes looking once a day.
+    idealistaMcpUrl: out.idealista_mcp_url || "",
+    idealistaProbedAt: num("idealista_probed_at", 0),
     billingEnabled: out.billing_enabled === "1"
   };
 }
@@ -1192,6 +1317,33 @@ async function audioUsesLastHour(env, actor) {
     const row = await env.DB.prepare(sql).bind(actor.user ? actor.user.id : (actor.anonKey || ""), since).first();
     return row ? Number(row.n) : 0;
   } catch (e) { return 0; }
+}
+
+// Asks OpenAI one harmless question — "does this model exist for me?" — and
+// reports what came back. It costs nothing, transcribes nothing, and returns
+// only a status and the short error code, never the key or the error body.
+async function transcribeHealth(env) {
+  const key = env.OPENAI_API_KEY;
+  const out = { configured: !!key, model: "gpt-transcribe" };
+  if (!key) return jsonOk(out);
+  try {
+    const res = await fetch("https://api.openai.com/v1/models/" + out.model, {
+      headers: { authorization: "Bearer " + key }
+    });
+    out.upstream = res.status;
+    out.ok = res.ok;
+    if (!res.ok) {
+      try {
+        const err = await res.json();
+        const e = err && err.error;
+        if (e) out.reason = String(e.code || e.type || "").slice(0, 40);
+      } catch (e) { /* non-JSON upstream error */ }
+    }
+  } catch (e) {
+    out.ok = false;
+    out.reason = "unreachable";
+  }
+  return jsonOk(out);
 }
 
 async function handleTranscribe(request, env, cfg, ctx) {
@@ -1653,6 +1805,12 @@ export default {
     }
 
     if (url.pathname === "/api/transcribe") {
+      // GET is a health probe, not a transcription. "The microphone is broken"
+      // has meant four different things so far — a denied permission, a codec
+      // Safari would not produce, our own rate limit, and an empty OpenAI
+      // balance — and only one of them is in the browser. This answers which,
+      // from any device, without a microphone and without revealing the key.
+      if (request.method === "GET") return transcribeHealth(env);
       if (request.method !== "POST") return jsonError(405, "method_not_allowed");
       const cfg = hasDB(env)
         ? await loadSettings(env)
@@ -1676,7 +1834,7 @@ export default {
       const gate = await gateChat(request, env, cfg);
       if (gate.response) return gate.response;
 
-      const res = await handleChatPost(request, env);
+      const res = await handleChatPost(request, env, cfg);
 
       // Meter the answer on its way out. The bytes are passed through
       // unchanged; the ledger write happens after the last byte, off the
