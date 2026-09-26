@@ -905,7 +905,7 @@
     text-decoration-color: rgba(255, 255, 255, 0.6);
   }
   .acct-link:hover { color: #fff; text-decoration-color: #fff; }
-  .acct-link[hidden], #footer-name[hidden] { display: none; }
+  .acct-link[hidden], #footer-sep[hidden] { display: none; }
   /* A second way in: the orb is its own link to the same page. It is
      absolutely positioned inside the footer and out of flow, so it shifts
      nothing, and its spot is chosen (and machine-checked at every width) so
@@ -3773,13 +3773,11 @@
   <footer>
     <div class="footer-row footer-brand">
       <span><strong>ROILITY, S.L.</strong></span>
-      <span>&middot;</span>
-      <!-- The name slot. With nobody signed in it shows whose copy of Alla
-           this is (the tenant). As soon as someone signs in it becomes THEIR
-           own name — or their email, until they give a name — and turns into
-           a link into their cabinet. Only the "MVP" build marker was dropped
-           from the original label. -->
-      <span id="footer-name">tenant: ROILITY</span>
+      <!-- The account slot, and nothing else. A visitor sees the company name
+           on its own: "tenant" was our own word for whose copy of Alla this
+           is, which means something to us and nothing to them. Once someone
+           signs in, their name appears here and links into their cabinet. -->
+      <span id="footer-sep" hidden>&middot;</span>
       <a class="acct-link" id="footer-account" href="account.html" hidden></a>
     </div>
     <div class="footer-row footer-links">
@@ -5614,15 +5612,15 @@
   (function () {
     "use strict";
     var link = document.getElementById("footer-account");
-    var fallback = document.getElementById("footer-name");
-    if (!link || !fallback) return;
+    var sep = document.getElementById("footer-sep");
+    if (!link) return;
     fetch("/api/account", { credentials: "same-origin" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (a) {
         if (!a || !a.signedIn) return;
         link.textContent = a.name || a.email;
         link.hidden = false;
-        fallback.hidden = true;
+        if (sep) sep.hidden = false;
       })
       .catch(function () {});
   })();
