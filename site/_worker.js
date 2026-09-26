@@ -1691,11 +1691,11 @@ async function requireUser(request, env) {
   return { user };
 }
 
-async function readJson(request) {
+async function readJsonObject(request) {
   try { return await request.json(); } catch (e) { return {}; }
 }
 
-function cleanName(v, max) {
+function cleanLabel(v, max) {
   // One line, trimmed, no control characters — a folder name ends up in a
   // menu, not in a database query.
   return String(v == null ? "" : v).replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, max);
@@ -1764,10 +1764,10 @@ async function handleFolders(request, env, action) {
   const gate = await requireUser(request, env);
   if (gate.response) return gate.response;
   const user = gate.user;
-  const body = await readJson(request);
+  const body = await readJsonObject(request);
 
   if (action === "new") {
-    const name = cleanName(body.name, FOLDER_NAME_MAX) || "New folder";
+    const name = cleanLabel(body.name, FOLDER_NAME_MAX) || "New folder";
     const parent = body.parent_id ? String(body.parent_id) : null;
     try {
       const count = await env.DB.prepare(
@@ -1790,7 +1790,7 @@ async function handleFolders(request, env, action) {
   }
 
   if (action === "rename") {
-    const name = cleanName(body.name, FOLDER_NAME_MAX);
+    const name = cleanLabel(body.name, FOLDER_NAME_MAX);
     if (!name) return jsonError(400, "name_required");
     try {
       const r = await env.DB.prepare(
@@ -1849,7 +1849,7 @@ async function handleConversations(request, env, action) {
   const gate = await requireUser(request, env);
   if (gate.response) return gate.response;
   const user = gate.user;
-  const body = await readJson(request);
+  const body = await readJsonObject(request);
 
   if (action === "new") {
     const folder = body.folder_id ? String(body.folder_id) : null;
@@ -1864,13 +1864,13 @@ async function handleConversations(request, env, action) {
       const now = nowSec();
       await env.DB.prepare(
         "INSERT INTO conversations (id, user_id, started_at, last_at, title, folder_id) VALUES (?, ?, ?, ?, ?, ?)"
-      ).bind(id, user.id, now, now, cleanName(body.title, TITLE_MAX) || null, folder).run();
+      ).bind(id, user.id, now, now, cleanLabel(body.title, TITLE_MAX) || null, folder).run();
       return jsonOk({ id, folder_id: folder });
     } catch (e) { return jsonError(500, "could_not_create"); }
   }
 
   if (action === "rename") {
-    const title = cleanName(body.title, TITLE_MAX);
+    const title = cleanLabel(body.title, TITLE_MAX);
     if (!title) return jsonError(400, "title_required");
     try {
       await env.DB.prepare(
@@ -2037,7 +2037,7 @@ async function handleClientProfile(request, env) {
     return jsonOk({ facts: facts || "" });
   }
 
-  const body = await readJson(request);
+  const body = await readJsonObject(request);
   const facts = String(body.facts == null ? "" : body.facts);
 
   if (!facts.trim()) {
@@ -2059,7 +2059,7 @@ async function handleForget(request, env) {
   if (gate.response) return gate.response;
   const user = gate.user;
 
-  const body = await readJson(request);
+  const body = await readJsonObject(request);
   if (body.confirm !== "DELETE") return jsonError(400, "confirmation_required");
 
   const fileIds = await reportIdsOf(env, user.id);
