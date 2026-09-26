@@ -774,7 +774,7 @@ function attachFiles(cleaned, raw) {
   return jsonError(400, "invalid_history");
 }
 
-async function handleChatPost(request, env, cfg) {
+async function handleChatPost(request, env, cfg, actor) {
   cfg = cfg || {};
   if (!env.ANTHROPIC_API_KEY) {
     return jsonError(500, "server_not_configured");
@@ -813,6 +813,13 @@ async function handleChatPost(request, env, cfg) {
   }
 
   const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+
+  // What Alla already knows about this person, from her own earlier
+  // conversations with them. Signed-in clients only: a signed-out visitor has
+  // no name to attach a memory to.
+  const profile = (actor && actor.user) ? await loadProfile(env, actor.user.id) : "";
+  const SYSTEM = profile ? SYSTEM_PROMPT + profileBlock(profile) : SYSTEM_PROMPT;
+
   const lastUserMessage = [...cleaned].reverse().find((m) => m.role === "user");
   const lastText = lastUserMessage && lastUserMessage.content;
   const useCadastreTool = looksLikeCadastreQuery(lastText);
@@ -877,7 +884,7 @@ async function handleChatPost(request, env, cfg) {
       anthropicRes = await askAnthropic({
           model,
           max_tokens: MAX_TOKENS,
-          system: SYSTEM_PROMPT,
+          system: SYSTEM,
           stream: true,
           // Web search only. It is executed by Anthropic inside this same
           // streamed response, so the fast path stays a single call with no
@@ -930,7 +937,7 @@ async function handleChatPost(request, env, cfg) {
       res = await askAnthropic({
           model,
           max_tokens: MAX_TOKENS,
-          system: SYSTEM_PROMPT,
+          system: SYSTEM,
           // Both, deliberately: the cadastre says what the property legally
           // is, the search says what the rules and the prices around it are.
           // Web search runs server-side, so the loop below only ever has to
@@ -994,7 +1001,7 @@ async function handleChatPost(request, env, cfg) {
     const toolResults = [];
     for (const block of toolUseBlocks) {
       const result = block.name === "property_report"
-        ? await runReportTool(block.input, env, request)
+        ? await runReportTool(block.input, env, request, actor)
         : await runCatastroTool(block.input);
       toolResults.push({
         type: "tool_result",
@@ -1017,7 +1024,7 @@ async function handleChatPost(request, env, cfg) {
         "x-api-key": env.ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01"
       },
-      body: JSON.stringify({ model, max_tokens: MAX_TOKENS, system: SYSTEM_PROMPT, stream: true, messages: cleaned })
+      body: JSON.stringify({ model, max_tokens: MAX_TOKENS, system: SYSTEM, stream: true, messages: cleaned })
     });
   } catch (e) {
     return jsonError(502, "upstream_unreachable");
@@ -1105,6 +1112,9 @@ async function loadSettings(env) {
     // and then discoverIdealista() goes looking once a day.
     idealistaMcpUrl: out.idealista_mcp_url || "",
     idealistaProbedAt: num("idealista_probed_at", 0),
+    // The background note-keeper can run on a cheaper model than the one that
+    // answers; empty means "the same one".
+    profileModel: out.profile_model || "",
     billingEnabled: out.billing_enabled === "1"
   };
 }
@@ -1470,6 +1480,627 @@ async function transcribe(request, env, cfg, ctx, key) {
 
   return jsonOk({ text });
 }
+
+
+// ---------- memory ----------
+//
+// An estate agent who forgets the client between visits is not an agent. Up
+// to now the whole conversation lived in one JavaScript array in one browser
+// tab: reload the page and it was gone, and a phone and a laptop knew nothing
+// of each other. Two things fix that, and they are different things.
+//
+//   * The TRANSCRIPT — what was said. Stored per signed-in client, one
+//     running thread, restored on any device they sign in from.
+//   * The PROFILE — what Alla has learned and should still know in a year:
+//     budget, islands, purpose, constraints, what was rejected and why. A
+//     few hundred words, sent with every message, so she opens a conversation
+//     already knowing the person.
+//
+// Both need a name to attach to. A signed-out visitor is identified only by
+// "this IP, today", which is shared with everyone behind the same router and
+// gone tomorrow — so for them the thread is kept in their own browser and
+// never leaves it. Cross-device memory needs an account; that is arithmetic,
+// not a limitation we can engineer away.
+
+const HISTORY_RETURNED = 200;      // messages handed back to a restoring client
+const PROFILE_MAX = 4000;          // characters of profile sent with every turn
+const MESSAGE_MAX = 20000;         // one stored message
+
+// One open thread per client, the way a client has one relationship with an
+// agency. A new thread is only started when the client asks for one.
+async function currentConversation(env, userId, create) {
+  try {
+    const row = await env.DB.prepare(
+      "SELECT id FROM conversations WHERE user_id = ? ORDER BY last_at DESC LIMIT 1"
+    ).bind(userId).first();
+    if (row) return row.id;
+    if (!create) return null;
+    const id = crypto.randomUUID();
+    const now = nowSec();
+    await env.DB.prepare(
+      "INSERT INTO conversations (id, user_id, started_at, last_at) VALUES (?, ?, ?, ?)"
+    ).bind(id, userId, now, now).run();
+    return id;
+  } catch (e) { return null; }
+}
+
+async function saveMessage(env, conversationId, role, content) {
+  if (!conversationId || !content) return;
+  const text = String(content).slice(0, MESSAGE_MAX);
+  try {
+    await env.DB.prepare(
+      "INSERT INTO messages (conversation_id, role, content, at) VALUES (?, ?, ?, ?)"
+    ).bind(conversationId, role, text, nowSec()).run();
+    await env.DB.prepare(
+      "UPDATE conversations SET last_at = ? WHERE id = ?"
+    ).bind(nowSec(), conversationId).run();
+  } catch (e) { /* a lost line must never cost the person their answer */ }
+}
+
+async function loadProfile(env, userId) {
+  if (!userId) return "";
+  try {
+    const row = await env.DB.prepare(
+      "SELECT facts FROM client_profile WHERE user_id = ?"
+    ).bind(userId).first();
+    return row && row.facts ? String(row.facts).slice(0, PROFILE_MAX) : "";
+  } catch (e) { return ""; }
+}
+
+// Alla rewrites the whole profile rather than appending, so it stays a short
+// current picture instead of growing into a second transcript.
+async function saveProfile(env, userId, facts) {
+  if (!userId) return false;
+  const text = String(facts || "").trim().slice(0, PROFILE_MAX);
+  if (!text) return false;
+  try {
+    await env.DB.prepare(
+      "INSERT INTO client_profile (user_id, facts, updated_at) VALUES (?, ?, ?) " +
+      "ON CONFLICT(user_id) DO UPDATE SET facts = excluded.facts, updated_at = excluded.updated_at"
+    ).bind(userId, text, nowSec()).run();
+    return true;
+  } catch (e) { return false; }
+}
+
+// Keeping the profile current is not part of answering, so it does not happen
+// in the person's turn. After the reply has been sent, a short background call
+// reads the exchange against the existing note and rewrites it. That keeps the
+// answer fast, keeps one writer on the note, and costs a fraction of a message
+// because the input is a page of text rather than a conversation.
+const PROFILE_INSTRUCTION = [
+  "You keep the standing note a property adviser holds on one client. You are ",
+  "given the current note and the exchange that just happened. Return the WHOLE ",
+  "replacement note and nothing else — no preamble, no explanation.\n\n",
+  "Keep it under a page of short lines, one fact per line, in the language the ",
+  "client writes in. Record only what the CLIENT stated: budget and how it is ",
+  "financed, where they are looking, whether it is to live in, to let or to ",
+  "develop, timing, who else decides with them, what they ruled out and why, ",
+  "and any property or reference they are working on. Their own words for ",
+  "things, not yours.\n\n",
+  "Do NOT record: your own advice or conclusions, figures you looked up, ",
+  "anything true only today, or pleasantries. Do not invent. If the exchange ",
+  "added nothing durable, return the current note UNCHANGED. If something has ",
+  "changed, correct that line rather than adding a second one beside it."
+].join("");
+
+async function updateProfile(env, cfg, userId, said, answer) {
+  if (!userId || !said || !env.ANTHROPIC_API_KEY) return;
+  const current = await loadProfile(env, userId);
+  const model = (cfg && cfg.profileModel) || env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+  const body = {
+    model,
+    max_tokens: 900,
+    system: PROFILE_INSTRUCTION,
+    messages: [{
+      role: "user",
+      content:
+        "CURRENT NOTE:\n" + (current || "(empty)") +
+        "\n\nCLIENT SAID:\n" + String(said).slice(0, 4000) +
+        "\n\nYOU REPLIED:\n" + String(answer || "").slice(0, 4000),
+    }],
+  };
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    let text = "";
+    for (const block of data.content || []) {
+      if (block.type === "text") text += block.text;
+    }
+    text = text.trim();
+    if (!text || text === current) return;
+    await saveProfile(env, userId, text);
+  } catch (e) { /* a note that failed to update is not worth an error */ }
+}
+
+// What Alla is told about the person before she reads their message.
+function profileBlock(facts) {
+  if (!facts) return "";
+  return "\n\nWHAT YOU ALREADY KNOW ABOUT THIS CLIENT, from your own earlier " +
+    "conversations with them:\n" + facts + "\n\n" +
+    "Use it the way a person would: let it shape what you suggest and what you " +
+    "no longer need to ask. Do not recite it back, do not say that you " +
+    "remember, and do not treat it as verified — it is what they told you, and " +
+    "a figure in it can be out of date. If something in it contradicts what " +
+    "they say now, what they say now wins, and say so plainly rather than " +
+    "arguing from the note.";
+}
+
+// GET /api/history — what the browser asks for on load so the conversation is
+// where the client left it, whichever device they left it on.
+async function handleHistory(request, env) {
+  if (!hasDB(env)) return jsonOk({ signedIn: false, messages: [] });
+  const user = await currentUser(request, env);
+  if (!user) return jsonOk({ signedIn: false, messages: [] });
+
+  // ?c=<id> opens a particular thread — the sidebar's job. Without it, the
+  // one they were last in.
+  const asked = new URL(request.url).searchParams.get("c");
+  let conversationId = null;
+  if (asked) {
+    try {
+      const row = await env.DB.prepare(
+        "SELECT id FROM conversations WHERE id = ? AND user_id = ?"
+      ).bind(asked, user.id).first();
+      if (row) conversationId = row.id;
+    } catch (e) { /* fall back below */ }
+  }
+  if (!conversationId) conversationId = await currentConversation(env, user.id, false);
+  if (!conversationId) return jsonOk({ signedIn: true, messages: [] });
+
+  try {
+    const rs = await env.DB.prepare(
+      "SELECT role, content, at FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?"
+    ).bind(conversationId, HISTORY_RETURNED).all();
+    const rows = (rs.results || []).slice().reverse();
+    return jsonOk({ signedIn: true, conversation: conversationId, messages: rows });
+  } catch (e) {
+    return jsonOk({ signedIn: true, messages: [] });
+  }
+}
+
+// ---------- folders ----------
+//
+// One long thread is right for one client and wrong for an agency. A person
+// works on a plot in Son Parc, a reform in Maó and a mortgage question at the
+// same time, and mixing those into a single conversation makes all three
+// worse. So conversations sit in folders, nested like any file manager, and
+// the client chooses which thread they are in.
+//
+// Folders belong to an account. Everything below refuses politely for a
+// signed-out visitor rather than inventing an owner for them.
+
+const FOLDER_NAME_MAX = 80;
+const TITLE_MAX = 120;
+const FOLDER_DEPTH_MAX = 6;      // deep enough to organise, shallow enough to navigate
+const FOLDERS_MAX = 300;         // per account
+const THREADS_RETURNED = 300;
+
+async function requireUser(request, env) {
+  if (!hasDB(env)) return { response: jsonError(503, "no_db") };
+  const user = await currentUser(request, env);
+  if (!user) return { response: jsonError(401, "sign_in_required") };
+  return { user };
+}
+
+async function readJson(request) {
+  try { return await request.json(); } catch (e) { return {}; }
+}
+
+function cleanName(v, max) {
+  // One line, trimmed, no control characters — a folder name ends up in a
+  // menu, not in a database query.
+  return String(v == null ? "" : v).replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, max);
+}
+
+// GET /api/threads — the whole tree for this account in one request. It is a
+// few hundred short rows at most, so paginating it would cost more round
+// trips than it saves bytes.
+async function handleThreads(request, env) {
+  if (!hasDB(env)) return jsonOk({ signedIn: false, folders: [], conversations: [] });
+  const user = await currentUser(request, env);
+  if (!user) return jsonOk({ signedIn: false, folders: [], conversations: [] });
+
+  try {
+    const [f, c] = await Promise.all([
+      env.DB.prepare(
+        "SELECT id, parent_id, name, created_at FROM folders WHERE user_id = ? ORDER BY name COLLATE NOCASE"
+      ).bind(user.id).all(),
+      env.DB.prepare(
+        "SELECT id, folder_id, title, started_at, last_at FROM conversations " +
+        "WHERE user_id = ? ORDER BY last_at DESC LIMIT ?"
+      ).bind(user.id, THREADS_RETURNED).all(),
+    ]);
+    const conversations = c.results || [];
+    return jsonOk({
+      signedIn: true,
+      folders: f.results || [],
+      conversations,
+      current: conversations.length ? conversations[0].id : null,
+    });
+  } catch (e) {
+    return jsonOk({ signedIn: true, folders: [], conversations: [] });
+  }
+}
+
+// Walks up the chain to make sure a move cannot put a folder inside itself —
+// which would detach that whole branch from the tree and lose it from view.
+async function wouldCycle(env, userId, folderId, newParentId) {
+  let at = newParentId, hops = 0;
+  while (at && hops < FOLDER_DEPTH_MAX + 2) {
+    if (at === folderId) return true;
+    const row = await env.DB.prepare(
+      "SELECT parent_id FROM folders WHERE id = ? AND user_id = ?"
+    ).bind(at, userId).first();
+    if (!row) return false;
+    at = row.parent_id;
+    hops++;
+  }
+  return hops >= FOLDER_DEPTH_MAX + 2;
+}
+
+async function depthOf(env, userId, folderId) {
+  let at = folderId, depth = 0;
+  while (at && depth < FOLDER_DEPTH_MAX + 2) {
+    const row = await env.DB.prepare(
+      "SELECT parent_id FROM folders WHERE id = ? AND user_id = ?"
+    ).bind(at, userId).first();
+    if (!row) break;
+    at = row.parent_id;
+    depth++;
+  }
+  return depth;
+}
+
+async function handleFolders(request, env, action) {
+  const gate = await requireUser(request, env);
+  if (gate.response) return gate.response;
+  const user = gate.user;
+  const body = await readJson(request);
+
+  if (action === "new") {
+    const name = cleanName(body.name, FOLDER_NAME_MAX) || "New folder";
+    const parent = body.parent_id ? String(body.parent_id) : null;
+    try {
+      const count = await env.DB.prepare(
+        "SELECT COUNT(*) AS n FROM folders WHERE user_id = ?"
+      ).bind(user.id).first();
+      if (count && Number(count.n) >= FOLDERS_MAX) return jsonError(400, "too_many_folders");
+      if (parent) {
+        const owns = await env.DB.prepare(
+          "SELECT id FROM folders WHERE id = ? AND user_id = ?"
+        ).bind(parent, user.id).first();
+        if (!owns) return jsonError(404, "parent_not_found");
+        if (await depthOf(env, user.id, parent) >= FOLDER_DEPTH_MAX) return jsonError(400, "too_deep");
+      }
+      const id = crypto.randomUUID();
+      await env.DB.prepare(
+        "INSERT INTO folders (id, user_id, parent_id, name, created_at) VALUES (?, ?, ?, ?, ?)"
+      ).bind(id, user.id, parent, name, nowSec()).run();
+      return jsonOk({ id, name, parent_id: parent });
+    } catch (e) { return jsonError(500, "could_not_create"); }
+  }
+
+  if (action === "rename") {
+    const name = cleanName(body.name, FOLDER_NAME_MAX);
+    if (!name) return jsonError(400, "name_required");
+    try {
+      const r = await env.DB.prepare(
+        "UPDATE folders SET name = ? WHERE id = ? AND user_id = ?"
+      ).bind(name, String(body.id || ""), user.id).run();
+      return jsonOk({ ok: true, changed: r.meta ? r.meta.changes : 1 });
+    } catch (e) { return jsonError(500, "could_not_rename"); }
+  }
+
+  if (action === "move") {
+    const id = String(body.id || "");
+    const parent = body.parent_id ? String(body.parent_id) : null;
+    if (!id) return jsonError(400, "id_required");
+    try {
+      if (parent) {
+        const owns = await env.DB.prepare(
+          "SELECT id FROM folders WHERE id = ? AND user_id = ?"
+        ).bind(parent, user.id).first();
+        if (!owns) return jsonError(404, "parent_not_found");
+        if (await wouldCycle(env, user.id, id, parent)) return jsonError(400, "would_nest_inside_itself");
+      }
+      await env.DB.prepare(
+        "UPDATE folders SET parent_id = ? WHERE id = ? AND user_id = ?"
+      ).bind(parent, id, user.id).run();
+      return jsonOk({ ok: true });
+    } catch (e) { return jsonError(500, "could_not_move"); }
+  }
+
+  if (action === "delete") {
+    // Deleting a folder never deletes a conversation. Anything inside comes
+    // up one level — a misplaced click should cost a bit of tidying, not a
+    // client's history.
+    const id = String(body.id || "");
+    if (!id) return jsonError(400, "id_required");
+    try {
+      const row = await env.DB.prepare(
+        "SELECT parent_id FROM folders WHERE id = ? AND user_id = ?"
+      ).bind(id, user.id).first();
+      if (!row) return jsonError(404, "not_found");
+      const up = row.parent_id || null;
+      await env.DB.batch([
+        env.DB.prepare("UPDATE folders SET parent_id = ? WHERE parent_id = ? AND user_id = ?")
+          .bind(up, id, user.id),
+        env.DB.prepare("UPDATE conversations SET folder_id = ? WHERE folder_id = ? AND user_id = ?")
+          .bind(up, id, user.id),
+        env.DB.prepare("DELETE FROM folders WHERE id = ? AND user_id = ?").bind(id, user.id),
+      ]);
+      return jsonOk({ ok: true, moved_to: up });
+    } catch (e) { return jsonError(500, "could_not_delete"); }
+  }
+
+  return jsonError(404, "not_found");
+}
+
+async function handleConversations(request, env, action) {
+  const gate = await requireUser(request, env);
+  if (gate.response) return gate.response;
+  const user = gate.user;
+  const body = await readJson(request);
+
+  if (action === "new") {
+    const folder = body.folder_id ? String(body.folder_id) : null;
+    try {
+      if (folder) {
+        const owns = await env.DB.prepare(
+          "SELECT id FROM folders WHERE id = ? AND user_id = ?"
+        ).bind(folder, user.id).first();
+        if (!owns) return jsonError(404, "folder_not_found");
+      }
+      const id = crypto.randomUUID();
+      const now = nowSec();
+      await env.DB.prepare(
+        "INSERT INTO conversations (id, user_id, started_at, last_at, title, folder_id) VALUES (?, ?, ?, ?, ?, ?)"
+      ).bind(id, user.id, now, now, cleanName(body.title, TITLE_MAX) || null, folder).run();
+      return jsonOk({ id, folder_id: folder });
+    } catch (e) { return jsonError(500, "could_not_create"); }
+  }
+
+  if (action === "rename") {
+    const title = cleanName(body.title, TITLE_MAX);
+    if (!title) return jsonError(400, "title_required");
+    try {
+      await env.DB.prepare(
+        "UPDATE conversations SET title = ? WHERE id = ? AND user_id = ?"
+      ).bind(title, String(body.id || ""), user.id).run();
+      return jsonOk({ ok: true });
+    } catch (e) { return jsonError(500, "could_not_rename"); }
+  }
+
+  if (action === "move") {
+    const folder = body.folder_id ? String(body.folder_id) : null;
+    try {
+      if (folder) {
+        const owns = await env.DB.prepare(
+          "SELECT id FROM folders WHERE id = ? AND user_id = ?"
+        ).bind(folder, user.id).first();
+        if (!owns) return jsonError(404, "folder_not_found");
+      }
+      await env.DB.prepare(
+        "UPDATE conversations SET folder_id = ? WHERE id = ? AND user_id = ?"
+      ).bind(folder, String(body.id || ""), user.id).run();
+      return jsonOk({ ok: true });
+    } catch (e) { return jsonError(500, "could_not_move"); }
+  }
+
+  if (action === "delete") {
+    const id = String(body.id || "");
+    if (!id) return jsonError(400, "id_required");
+    try {
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM messages WHERE conversation_id IN " +
+                       "(SELECT id FROM conversations WHERE id = ? AND user_id = ?)").bind(id, user.id),
+        env.DB.prepare("DELETE FROM conversations WHERE id = ? AND user_id = ?").bind(id, user.id),
+      ]);
+      return jsonOk({ ok: true });
+    } catch (e) { return jsonError(500, "could_not_delete"); }
+  }
+
+  return jsonError(404, "not_found");
+}
+
+// A thread with no name is hard to find again a week later, so the first
+// thing the client says becomes the name — until they rename it themselves.
+async function titleIfUntitled(env, conversationId, said) {
+  if (!conversationId || !said) return;
+  try {
+    const row = await env.DB.prepare(
+      "SELECT title FROM conversations WHERE id = ?"
+    ).bind(conversationId).first();
+    if (!row || row.title) return;
+    let title = String(said).replace(/\s+/g, " ").trim().slice(0, 60);
+    if (String(said).trim().length > 60) title += "…";
+    await env.DB.prepare(
+      "UPDATE conversations SET title = ? WHERE id = ?"
+    ).bind(title, conversationId).run();
+  } catch (e) { /* an unnamed thread is a small loss */ }
+}
+
+// The conversation a message belongs to: the one the client says they are in,
+// if it is really theirs, and otherwise their most recent.
+async function conversationFor(env, userId, requestedId) {
+  if (requestedId) {
+    try {
+      const row = await env.DB.prepare(
+        "SELECT id FROM conversations WHERE id = ? AND user_id = ?"
+      ).bind(String(requestedId), userId).first();
+      if (row) return row.id;
+    } catch (e) { /* fall through to the most recent */ }
+  }
+  return currentConversation(env, userId, true);
+}
+
+
+
+// ---------- the client's own data ----------
+//
+// Alla keeps a standing note on every client and a transcript of everything
+// they have said to her. Under the GDPR that gives the client three rights
+// that have to be exercisable, not merely honoured on request by email:
+// to SEE what is held, to CORRECT it, and to have it ERASED. Article 15,
+// 16 and 17. This is the whole of that, and it has to exist before the
+// product is sold to anyone.
+//
+// One deliberate exception to erasure: the usage ledger. Those rows are the
+// accounting record behind invoices, which Spanish law requires be kept — so
+// erasure detaches them from the person rather than deleting them. Everything
+// that is actually *about* the client goes.
+
+// GET /api/account/data — everything held, as one JSON file the client can
+// keep. Portability means a form they can use elsewhere, not a screenshot.
+async function handleExportData(request, env) {
+  const gate = await requireUser(request, env);
+  if (gate.response) return gate.response;
+  const user = gate.user;
+
+  try {
+    const [profile, convs, msgs, reps, ledger] = await Promise.all([
+      env.DB.prepare("SELECT facts, updated_at FROM client_profile WHERE user_id = ?")
+        .bind(user.id).first(),
+      env.DB.prepare("SELECT id, folder_id, title, started_at, last_at FROM conversations WHERE user_id = ? ORDER BY started_at")
+        .bind(user.id).all(),
+      env.DB.prepare(
+        "SELECT m.conversation_id, m.role, m.content, m.at FROM messages m " +
+        "JOIN conversations c ON c.id = m.conversation_id WHERE c.user_id = ? ORDER BY m.id"
+      ).bind(user.id).all(),
+      env.DB.prepare("SELECT id, title, created_at, expires_at FROM reports WHERE user_id = ? ORDER BY created_at")
+        .bind(user.id).all(),
+      env.DB.prepare(
+        "SELECT at, model, input_tokens, output_tokens, search_requests, audio_seconds, eur_micros " +
+        "FROM usage_ledger WHERE user_id = ? ORDER BY at"
+      ).bind(user.id).all(),
+    ]);
+
+    const folders = await env.DB.prepare(
+      "SELECT id, parent_id, name, created_at FROM folders WHERE user_id = ?"
+    ).bind(user.id).all();
+
+    const payload = {
+      exported_at: new Date().toISOString(),
+      account: {
+        email: user.email,
+        display_name: user.display_name || null,
+        created_at: user.created_at,
+      },
+      what_alla_remembers_about_you: profile ? profile.facts : null,
+      what_alla_remembers_updated_at: profile ? profile.updated_at : null,
+      folders: folders.results || [],
+      conversations: convs.results || [],
+      messages: msgs.results || [],
+      reports: reps.results || [],
+      usage: ledger.results || [],
+      notes: {
+        usage:
+          "Usage rows are the accounting record behind billing. If you ask for " +
+          "your data to be erased they are kept, but detached from you.",
+        reports:
+          "Report files are stored for 90 days from the date they were made and " +
+          "then deleted automatically.",
+      },
+    };
+
+    return new Response(JSON.stringify(payload, null, 2), {
+      status: 200,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "content-disposition": 'attachment; filename="agent-alla-my-data.json"',
+        "cache-control": "no-store",
+      },
+    });
+  } catch (e) {
+    return jsonError(500, "export_failed");
+  }
+}
+
+// GET /api/account/profile — just the standing note, for showing on screen.
+// POST — replace it, or clear it with an empty string.
+async function handleClientProfile(request, env) {
+  const gate = await requireUser(request, env);
+  if (gate.response) return gate.response;
+  const user = gate.user;
+
+  if (request.method === "GET") {
+    const facts = await loadProfile(env, user.id);
+    return jsonOk({ facts: facts || "" });
+  }
+
+  const body = await readJson(request);
+  const facts = String(body.facts == null ? "" : body.facts);
+
+  if (!facts.trim()) {
+    try {
+      await env.DB.prepare("DELETE FROM client_profile WHERE user_id = ?").bind(user.id).run();
+      return jsonOk({ facts: "", cleared: true });
+    } catch (e) { return jsonError(500, "could_not_clear"); }
+  }
+
+  const ok = await saveProfile(env, user.id, facts);
+  return ok ? jsonOk({ facts: facts.slice(0, PROFILE_MAX) }) : jsonError(500, "could_not_save");
+}
+
+// POST /api/account/forget — erasure. Everything about the person goes; the
+// account itself and the billing rows stay, the latter with the link to the
+// person cut. Requires the word to be typed, because it cannot be undone.
+async function handleForget(request, env) {
+  const gate = await requireUser(request, env);
+  if (gate.response) return gate.response;
+  const user = gate.user;
+
+  const body = await readJson(request);
+  if (body.confirm !== "DELETE") return jsonError(400, "confirmation_required");
+
+  const fileIds = await reportIdsOf(env, user.id);
+
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        "DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = ?)"
+      ).bind(user.id),
+      env.DB.prepare("DELETE FROM conversations WHERE user_id = ?").bind(user.id),
+      env.DB.prepare("DELETE FROM folders WHERE user_id = ?").bind(user.id),
+      env.DB.prepare("DELETE FROM client_profile WHERE user_id = ?").bind(user.id),
+      // The row goes; the file in storage is removed below, and expires by
+      // itself in any case.
+      env.DB.prepare("DELETE FROM reports WHERE user_id = ?").bind(user.id),
+      env.DB.prepare("UPDATE usage_ledger SET user_id = NULL WHERE user_id = ?").bind(user.id),
+    ]);
+  } catch (e) {
+    return jsonError(500, "could_not_erase");
+  }
+
+  await forgetReportFiles(env, fileIds);
+  return jsonOk({ ok: true, erased_reports: fileIds.length });
+}
+
+// The report files themselves, deleted alongside the rows. Read first, then
+// erase, because after the batch above there is nothing left to list.
+async function forgetReportFiles(env, ids) {
+  if (!env.REPORTS || typeof env.REPORTS.delete !== "function") return;
+  for (const id of ids) {
+    try { await env.REPORTS.delete("reports/" + id + ".pdf"); } catch (e) { /* expires anyway */ }
+  }
+}
+
+async function reportIdsOf(env, userId) {
+  try {
+    const rs = await env.DB.prepare("SELECT id FROM reports WHERE user_id = ?").bind(userId).all();
+    return (rs.results || []).map((r) => r.id);
+  } catch (e) { return []; }
+}
+
 
 // ================= PDF generation =================
 // Everything from here to the end of the report section is the document
@@ -2187,7 +2818,7 @@ function looksLikeReportRequest(text) {
       || /меморандум|отч[её]т|справк[ауи]|документ\w*\s+(по|на)\b/i.test(text);
 }
 
-async function runReportTool(input, env, request) {
+async function runReportTool(input, env, request, actor) {
   if (!env.REPORTS || typeof env.REPORTS.put !== "function") {
     // Said plainly so Alla tells the person the truth rather than promising a
     // file that will never arrive.
@@ -2239,6 +2870,16 @@ async function runReportTool(input, env, request) {
     return { ok: false, error: "store_failed", message: String(e.message || e) };
   }
 
+  // Recorded so the client can find a report again without scrolling back
+  // through the conversation it was made in.
+  if (actor && actor.user && hasDB(env)) {
+    try {
+      await env.DB.prepare(
+        "INSERT INTO reports (id, user_id, title, created_at, expires_at) VALUES (?, ?, ?, ?, ?)"
+      ).bind(id, actor.user.id, input.title || null, nowSec(), expires).run();
+    } catch (e) { /* the file exists either way */ }
+  }
+
   const url = new URL("/r/" + id, request.url).toString();
   return {
     ok: true,
@@ -2278,7 +2919,10 @@ async function serveReport(id, env) {
 // counts out of it (message_start carries input, message_delta carries
 // output). The bytes are passed through untouched.
 function meterStream(body, onUsage) {
-  let inTok = 0, outTok = 0, searches = 0, buffer = "";
+  // Also accumulates the answer's text. It is already parsing this stream for
+  // token counts, and reading it twice to store what was said would mean
+  // buffering the whole reply a second time.
+  let inTok = 0, outTok = 0, searches = 0, buffer = "", answer = "";
   const decoder = new TextDecoder();
   const ts = new TransformStream({
     transform(chunk, controller) {
@@ -2297,6 +2941,9 @@ function meterStream(body, onUsage) {
               inTok = evt.message.usage.input_tokens || 0;
               outTok = evt.message.usage.output_tokens || 0;
               searches = searchesOf(evt.message.usage);
+            } else if (evt.type === "content_block_delta" && evt.delta &&
+                       evt.delta.type === "text_delta") {
+              answer += evt.delta.text || "";
             } else if (evt.type === "message_delta" && evt.usage) {
               if (evt.usage.output_tokens != null) outTok = evt.usage.output_tokens;
               const sn = searchesOf(evt.usage);
@@ -2306,7 +2953,7 @@ function meterStream(body, onUsage) {
         }
       }
     },
-    flush() { onUsage(inTok, outTok, searches); }
+    flush() { onUsage(inTok, outTok, searches, answer); }
   });
   return body.pipeThrough(ts);
 }
@@ -2618,6 +3265,10 @@ async function routeBilling(request, env, url, cfg) {
   if (p === "/api/auth/logout" && post) return handleLogout(request, env);
   if (p === "/api/account" && request.method === "GET") return handleAccount(request, env, cfg);
   if (p === "/api/account/name" && post) return handleSetName(request, env);
+  // Articles 15, 16 and 17: see it, correct it, erase it.
+  if (p === "/api/account/data" && request.method === "GET") return handleExportData(request, env);
+  if (p === "/api/account/profile") return handleClientProfile(request, env);
+  if (p === "/api/account/forget" && post) return handleForget(request, env);
   if (p === "/api/billing/checkout" && post) return handleCheckout(request, env, cfg, url);
   if (p === "/api/billing/portal" && post) return handlePortal(request, env, url);
   return null;
@@ -2644,6 +3295,23 @@ export default {
         return jsonError(405, "method_not_allowed");
       }
       return serveReport(url.pathname.slice(3), env);
+    }
+
+    if (url.pathname === "/api/history") {
+      if (request.method === "GET") return handleHistory(request, env);
+      return jsonError(405, "method_not_allowed");
+    }
+    if (url.pathname === "/api/threads") {
+      if (request.method === "GET") return handleThreads(request, env);
+      return jsonError(405, "method_not_allowed");
+    }
+    if (url.pathname.startsWith("/api/folders/")) {
+      if (request.method !== "POST") return jsonError(405, "method_not_allowed");
+      return handleFolders(request, env, url.pathname.slice("/api/folders/".length));
+    }
+    if (url.pathname.startsWith("/api/conversations/")) {
+      if (request.method !== "POST") return jsonError(405, "method_not_allowed");
+      return handleConversations(request, env, url.pathname.slice("/api/conversations/".length));
     }
 
     if (url.pathname === "/api/transcribe") {
@@ -2676,7 +3344,27 @@ export default {
       const gate = await gateChat(request, env, cfg);
       if (gate.response) return gate.response;
 
-      const res = await handleChatPost(request, env, cfg);
+      // The thread this message belongs to, and what the person said. Read
+      // from a clone so handleChatPost still gets an unread body.
+      let conversationId = null, said = "";
+      if (hasDB(env) && gate.actor && gate.actor.user) {
+        try {
+          const peek = await request.clone().json();
+          const msgs = Array.isArray(peek.messages) ? peek.messages : [];
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i] && msgs[i].role === "user" && typeof msgs[i].content === "string") {
+              said = msgs[i].content; break;
+            }
+          }
+          conversationId = await conversationFor(env, gate.actor.user.id, peek.conversation);
+          if (conversationId && said) {
+            ctx.waitUntil(saveMessage(env, conversationId, "user", said));
+            ctx.waitUntil(titleIfUntitled(env, conversationId, said));
+          }
+        } catch (e) { /* storing is never allowed to block answering */ }
+      }
+
+      const res = await handleChatPost(request, env, cfg, gate.actor);
 
       // Meter the answer on its way out. The bytes are passed through
       // unchanged; the ledger write happens after the last byte, off the
@@ -2684,8 +3372,14 @@ export default {
       const ctype = res.headers.get("content-type") || "";
       if (res.ok && res.body && ctype.indexOf("text/event-stream") !== -1 && hasDB(env)) {
         const model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
-        const metered = meterStream(res.body, (inTok, outTok, searches) => {
+        const metered = meterStream(res.body, (inTok, outTok, searches, answer) => {
           ctx.waitUntil(recordUsage(env, cfg, gate.actor, model, inTok, outTok, searches));
+          if (conversationId && answer) {
+            ctx.waitUntil(saveMessage(env, conversationId, "assistant", answer));
+            // After the reply has gone out, not before: the note-keeper runs
+            // off the response path so it can never slow an answer down.
+            ctx.waitUntil(updateProfile(env, cfg, gate.actor.user.id, said, answer));
+          }
         });
         return new Response(metered, { status: res.status, headers: res.headers });
       }

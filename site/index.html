@@ -348,8 +348,155 @@
     border-radius: 20px;
     box-shadow: 0 20px 50px rgba(15,18,22,0.18), 0 2px 8px rgba(15,18,22,0.08);
     display: flex;
-    flex-direction: column;
+    /* A row, since the card now has a sidebar beside the conversation. The
+       reading column keeps its own vertical layout in .chat-main. */
+    flex-direction: row;
     overflow: hidden;
+    position: relative;
+  }
+
+  .chat-main {
+    flex: 1;
+    min-width: 0;          /* lets the conversation column shrink, see .input-pill */
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Folders. Closed by default and absent entirely for a signed-out visitor,
+     so the landing page opens exactly as it did. */
+  .chat-side {
+    flex: 0 0 0;
+    width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+    border-right: 1px solid var(--line);
+    transition: flex-basis 200ms ease, width 200ms ease;
+  }
+  .chat.side-open .chat-side { flex-basis: 236px; width: 236px; }
+
+  .side-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 10px 8px 10px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .side-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .side-tree { flex: 1; overflow-y: auto; padding: 6px 6px 12px; }
+
+  .tree-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 6px 6px 6px 8px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    text-align: left;
+  }
+  .tree-row:hover { background: var(--accent-soft); }
+  .tree-row.current { background: var(--accent-soft); font-weight: 600; }
+  .tree-row .tree-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tree-row.folder { color: var(--ink); font-weight: 600; }
+  .tree-row .twist { width: 10px; flex-shrink: 0; color: var(--ink-soft); font-size: 10px; }
+  .tree-more {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    cursor: pointer;
+    padding: 0 2px;
+    border-radius: 6px;
+    opacity: 0;
+  }
+  .tree-row:hover .tree-more, .tree-more:focus-visible { opacity: 1; }
+  .side-empty { padding: 14px; font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
+
+  .tree-menu {
+    position: absolute;
+    z-index: 20;
+    min-width: 168px;
+    max-height: 260px;
+    overflow-y: auto;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(15,18,22,0.18);
+    padding: 4px;
+  }
+  .tree-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 7px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 7px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .tree-menu button:hover { background: var(--accent-soft); }
+  .tree-menu .menu-sep { height: 1px; background: var(--line); margin: 4px 2px; }
+  .tree-menu .menu-head {
+    padding: 6px 10px 4px;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  .chat-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px 6px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .chat-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .icon-btn-sm { width: 30px; height: 30px; }
+
+  /* On a phone the folders cover the conversation rather than squeezing it. */
+  @media (max-width: 720px) {
+    .chat.side-open .chat-side {
+      position: absolute;
+      top: 0; bottom: 0; left: 0;
+      width: 78%;
+      max-width: 290px;
+      flex-basis: auto;
+      z-index: 6;
+      box-shadow: 8px 0 24px rgba(15,18,22,0.18);
+    }
   }
 
   /* The chat card can be expanded. The default keeps the hero composition the
@@ -2307,12 +2454,38 @@
       <div class="globe-mount" aria-hidden="true"></div>
     </div>
 
-    <h1 id="hero-title"><span class="hero-line-main">Your AI Real Estate Agent. For Life.</span><span class="hero-line-accent">Global intelligence. Local expertise.</span></h1>
+    <h1 id="hero-title"><span class="hero-line-main">Your AI Real Estate Agent.</span><span class="hero-line-accent">Global intelligence. Local expertise.</span></h1>
   </div>
 </section>
 
 <div class="chat-shell">
   <div class="chat">
+    <aside class="chat-side" id="chat-side" hidden>
+      <div class="side-head">
+        <span class="side-title" id="side-title">Conversations</span>
+        <button id="new-folder" class="icon-btn icon-btn-sm" type="button" title="New folder">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M12 10.5v5M9.5 13h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="side-tree" id="side-tree"></div>
+    </aside>
+    <div class="chat-main">
+      <div class="chat-bar" id="chat-bar" hidden>
+        <button id="side-toggle" class="icon-btn icon-btn-sm" type="button" title="Conversations">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <span class="chat-title" id="chat-title"></span>
+        <button id="new-chat" class="icon-btn icon-btn-sm" type="button" title="New conversation">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
     <div class="chat-scroll" id="scroll"></div>
     <div class="composer">
       <div id="attach-list" class="attach-list" hidden></div>
@@ -2345,6 +2518,7 @@
           </button>
         </div>
       </div>
+    </div>
     </div>
   </div>
 </div>
@@ -3653,7 +3827,7 @@
   // (see the system prompt) — this only drives the static page chrome.
   var STRINGS = {
     en: {
-      heroTitle: '<span class="hero-line-main">Your AI Real Estate Agent. For Life.</span><span class="hero-line-accent">Global intelligence. Local expertise.</span>',
+      heroTitle: '<span class="hero-line-main">Your AI Real Estate Agent.</span><span class="hero-line-accent">Global intelligence. Local expertise.</span>',
       heroTagline: 'Ask about a property, a plot, or a deal below — Alla works through the returns, the taxes, and the document risks in the same conversation.',
       chipLegal: 'Legal review', chipTaxes: 'Taxes', chipZoning: 'Zoning & planning', chipRoi: 'ROI / buy-build-sell', chipDocs: 'Documents & emails',
       inputPlaceholder: 'Ask about a property, plot, taxes, ROI…',
@@ -3692,6 +3866,17 @@
       micErrorRateLimited: 'Too many voice messages in a row — try again in a few minutes.',
       micErrorNoSpeech: 'Alla didn\'t catch any speech — try again, a bit closer to the microphone.',
       micErrorService: 'Speech recognition is unavailable right now — this is on our side, not yours. Please type instead.',
+      threadsTitle: 'Conversations',
+      newChatLabel: 'New conversation',
+      newFolderLabel: 'New folder',
+      renameLabel: 'Rename',
+      moveLabel: 'Move to',
+      deleteLabel: 'Delete',
+      topLevelLabel: 'All conversations',
+      untitledLabel: 'Untitled',
+      signInForThreads: 'Sign in to keep your conversations and sort them into folders.',
+      deleteChatConfirm: 'Delete this conversation? This cannot be undone.',
+      folderNamePrompt: 'Folder name',
       whyH2: 'What actually changes for your business',
       whyPrevLabel: 'Previous', whyNextLabel: 'Next',
       card1Title: 'Investment-analyst depth, not listing descriptions',
@@ -3759,6 +3944,17 @@
       micErrorRateLimited: 'Demasiados mensajes de voz seguidos — inténtalo de nuevo en unos minutos.',
       micErrorNoSpeech: 'Alla no captó ninguna voz — inténtalo otra vez, más cerca del micrófono.',
       micErrorService: 'El reconocimiento de voz no está disponible ahora mismo — es cosa nuestra, no tuya. Escribe tu mensaje, por favor.',
+      threadsTitle: 'Conversaciones',
+      newChatLabel: 'Nueva conversación',
+      newFolderLabel: 'Nueva carpeta',
+      renameLabel: 'Renombrar',
+      moveLabel: 'Mover a',
+      deleteLabel: 'Eliminar',
+      topLevelLabel: 'Todas las conversaciones',
+      untitledLabel: 'Sin título',
+      signInForThreads: 'Inicia sesión para guardar tus conversaciones y ordenarlas en carpetas.',
+      deleteChatConfirm: '¿Eliminar esta conversación? No se puede deshacer.',
+      folderNamePrompt: 'Nombre de la carpeta',
       whyH2: 'Lo que realmente cambia para tu negocio',
       whyPrevLabel: 'Anterior', whyNextLabel: 'Siguiente',
       card1Title: 'Profundidad de analista de inversión, no descripciones de anuncio',
@@ -3826,6 +4022,17 @@
       micErrorRateLimited: 'Слишком много голосовых подряд — попробуйте через несколько минут.',
       micErrorNoSpeech: 'Алла не расслышала речь — попробуйте ещё раз, ближе к микрофону.',
       micErrorService: 'Распознавание речи сейчас недоступно — это на нашей стороне, не у вас. Напишите сообщение текстом.',
+      threadsTitle: 'Разговоры',
+      newChatLabel: 'Новый разговор',
+      newFolderLabel: 'Новая папка',
+      renameLabel: 'Переименовать',
+      moveLabel: 'Переместить в',
+      deleteLabel: 'Удалить',
+      topLevelLabel: 'Все разговоры',
+      untitledLabel: 'Без названия',
+      signInForThreads: 'Войдите, чтобы разговоры сохранялись и раскладывались по папкам.',
+      deleteChatConfirm: 'Удалить этот разговор? Это необратимо.',
+      folderNamePrompt: 'Название папки',
       whyH2: 'Что реально меняется для вашего бизнеса',
       whyPrevLabel: 'Назад', whyNextLabel: 'Вперёд',
       card1Title: 'Глубина инвестиционного аналитика, а не описание объявления',
@@ -3893,6 +4100,17 @@
       micErrorRateLimited: 'Zu viele Sprachnachrichten hintereinander — bitte in ein paar Minuten erneut versuchen.',
       micErrorNoSpeech: 'Alla hat keine Sprache gehört — bitte noch einmal, näher am Mikrofon.',
       micErrorService: 'Die Spracherkennung ist gerade nicht verfügbar — das liegt an uns, nicht an Ihnen. Bitte tippen Sie Ihre Nachricht.',
+      threadsTitle: 'Gespräche',
+      newChatLabel: 'Neues Gespräch',
+      newFolderLabel: 'Neuer Ordner',
+      renameLabel: 'Umbenennen',
+      moveLabel: 'Verschieben nach',
+      deleteLabel: 'Löschen',
+      topLevelLabel: 'Alle Gespräche',
+      untitledLabel: 'Ohne Titel',
+      signInForThreads: 'Melden Sie sich an, um Gespräche zu behalten und in Ordnern zu sortieren.',
+      deleteChatConfirm: 'Dieses Gespräch löschen? Das lässt sich nicht rückgängig machen.',
+      folderNamePrompt: 'Ordnername',
       whyH2: 'Was sich für Ihr Geschäft wirklich ändert',
       whyPrevLabel: 'Zurück', whyNextLabel: 'Weiter',
       card1Title: 'Tiefe eines Investmentanalysten, keine Anzeigenbeschreibung',
@@ -3960,6 +4178,17 @@
       micErrorRateLimited: 'Trop de messages vocaux d\'affilée — réessayez dans quelques minutes.',
       micErrorNoSpeech: 'Alla n\'a rien entendu — réessayez, plus près du micro.',
       micErrorService: "La reconnaissance vocale est indisponible pour le moment — cela vient de nous, pas de vous. Écrivez votre message.",
+      threadsTitle: 'Conversations',
+      newChatLabel: 'Nouvelle conversation',
+      newFolderLabel: 'Nouveau dossier',
+      renameLabel: 'Renommer',
+      moveLabel: 'Déplacer vers',
+      deleteLabel: 'Supprimer',
+      topLevelLabel: 'Toutes les conversations',
+      untitledLabel: 'Sans titre',
+      signInForThreads: 'Connectez-vous pour conserver vos conversations et les classer en dossiers.',
+      deleteChatConfirm: 'Supprimer cette conversation ? C\'est irréversible.',
+      folderNamePrompt: 'Nom du dossier',
       whyH2: 'Ce qui change réellement pour votre activité',
       whyPrevLabel: 'Précédent', whyNextLabel: 'Suivant',
       card1Title: "Profondeur d'analyste en investissement, pas une description d'annonce",
@@ -4027,6 +4256,17 @@
       micErrorRateLimited: 'Demasiadas mensagens de voz seguidas — tente novamente daqui a alguns minutos.',
       micErrorNoSpeech: 'A Alla não captou nenhuma fala — tente de novo, mais perto do microfone.',
       micErrorService: 'O reconhecimento de voz está indisponível de momento — o problema é nosso, não seu. Escreva a sua mensagem.',
+      threadsTitle: 'Conversas',
+      newChatLabel: 'Nova conversa',
+      newFolderLabel: 'Nova pasta',
+      renameLabel: 'Mudar o nome',
+      moveLabel: 'Mover para',
+      deleteLabel: 'Eliminar',
+      topLevelLabel: 'Todas as conversas',
+      untitledLabel: 'Sem título',
+      signInForThreads: 'Inicie sessão para guardar as conversas e organizá-las em pastas.',
+      deleteChatConfirm: 'Eliminar esta conversa? Não é reversível.',
+      folderNamePrompt: 'Nome da pasta',
       whyH2: 'O que realmente muda para o seu negócio',
       whyPrevLabel: 'Anterior', whyNextLabel: 'Seguinte',
       card1Title: 'Profundidade de analista de investimento, não descrições de anúncio',
@@ -4094,6 +4334,17 @@
       micErrorRateLimited: 'Troppi messaggi vocali di fila — riprova tra qualche minuto.',
       micErrorNoSpeech: 'Alla non ha sentito parlato — riprova, più vicino al microfono.',
       micErrorService: 'Il riconoscimento vocale non è disponibile al momento — dipende da noi, non da te. Scrivi pure il messaggio.',
+      threadsTitle: 'Conversazioni',
+      newChatLabel: 'Nuova conversazione',
+      newFolderLabel: 'Nuova cartella',
+      renameLabel: 'Rinomina',
+      moveLabel: 'Sposta in',
+      deleteLabel: 'Elimina',
+      topLevelLabel: 'Tutte le conversazioni',
+      untitledLabel: 'Senza titolo',
+      signInForThreads: 'Accedi per conservare le conversazioni e ordinarle in cartelle.',
+      deleteChatConfirm: 'Eliminare questa conversazione? Non è reversibile.',
+      folderNamePrompt: 'Nome della cartella',
       whyH2: 'Cosa cambia davvero per la tua attività',
       whyPrevLabel: 'Precedente', whyNextLabel: 'Successivo',
       card1Title: 'Profondità da analista di investimento, non descrizioni da annuncio',
@@ -4832,6 +5083,10 @@
   async function streamChat(turns, onDelta, attachments) {
     var payloadBody = { messages: turns };
     if (attachments && attachments.length) payloadBody.attachments = attachments;
+    // Which thread this belongs to. Without it the server would file every
+    // message under whichever conversation happened to be the most recent,
+    // and opening an older one to add a note would silently write elsewhere.
+    if (window.__allaConversation) payloadBody.conversation = window.__allaConversation;
     var res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -4933,6 +5188,12 @@
       thinkingBubble.classList.remove("thinking");
       thinkingBubble.textContent = finalText;
       history.push({ role: "assistant", content: finalText });
+      // Signed in, the server already stored this exchange; signed out, this
+      // is the only copy there is.
+      if (window.__allaRemember) window.__allaRemember();
+      // The first message of a new thread becomes its name, server-side —
+      // refresh so the sidebar shows it rather than "Untitled".
+      if (window.__allaConversation && Threads) setTimeout(Threads.refresh, 600);
     } catch (e) {
       thinkingBubble.parentElement.remove();
       var d = e && e.detail;
@@ -4959,6 +5220,371 @@
   // Opening state — static, no API call, so the page shows real
   // working content the moment it loads.
   addMessage("agent", T.greeting);
+
+  // ---------- folders ----------
+  //
+  // A client is not one conversation. They have a plot in Son Parc, a reform
+  // in Maó and a mortgage question, and mixing those into one thread makes
+  // all three worse. So: folders, nested, with conversations in them, the way
+  // every file manager has worked for forty years.
+  //
+  // It belongs to an account. For a signed-out visitor the whole column stays
+  // hidden and the page opens exactly as it always did — there is nothing to
+  // organise when nothing is being kept.
+  var Threads = (function () {
+    var side = document.getElementById("chat-side");
+    var bar = document.getElementById("chat-bar");
+    var tree = document.getElementById("side-tree");
+    var chatEl = document.querySelector(".chat");
+    var titleEl = document.getElementById("chat-title");
+
+    var state = { folders: [], conversations: [], current: null, open: {} };
+    var menu = null;
+
+    function t(key, fallback) { return T[key] || fallback; }
+
+    function api(path, body) {
+      return fetch(path, {
+        method: body ? "POST" : "GET",
+        headers: body ? { "content-type": "application/json" } : { accept: "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      }).then(function (r) { return r.ok ? r.json() : Promise.reject(r); });
+    }
+
+    function closeMenu() { if (menu) { menu.remove(); menu = null; } }
+    document.addEventListener("click", function (e) {
+      if (menu && !menu.contains(e.target)) closeMenu();
+    });
+
+    function openMenu(anchor, items) {
+      closeMenu();
+      menu = document.createElement("div");
+      menu.className = "tree-menu";
+      items.forEach(function (it) {
+        if (it.sep) { var d = document.createElement("div"); d.className = "menu-sep"; menu.appendChild(d); return; }
+        if (it.head) { var h = document.createElement("div"); h.className = "menu-head"; h.textContent = it.head; menu.appendChild(h); return; }
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = it.label;
+        b.addEventListener("click", function (ev) { ev.stopPropagation(); closeMenu(); it.run(); });
+        menu.appendChild(b);
+      });
+      chatEl.appendChild(menu);
+      var a = anchor.getBoundingClientRect();
+      var host = chatEl.getBoundingClientRect();
+      menu.style.left = Math.max(6, Math.min(a.left - host.left, host.width - 180)) + "px";
+      menu.style.top = (a.bottom - host.top + 4) + "px";
+    }
+
+    // The list of places a thing can be moved to — every folder, plus the top
+    // level, minus the branch you are inside if you are a folder yourself.
+    function moveTargets(excludeFolderId) {
+      var banned = {};
+      if (excludeFolderId) {
+        banned[excludeFolderId] = true;
+        var changed = true;
+        while (changed) {
+          changed = false;
+          state.folders.forEach(function (f) {
+            if (f.parent_id && banned[f.parent_id] && !banned[f.id]) { banned[f.id] = true; changed = true; }
+          });
+        }
+      }
+      var out = [{ id: null, name: t("topLevelLabel", "All conversations") }];
+      state.folders.forEach(function (f) { if (!banned[f.id]) out.push({ id: f.id, name: f.name }); });
+      return out;
+    }
+
+    function render() {
+      tree.innerHTML = "";
+      var byParent = {};
+      state.folders.forEach(function (f) {
+        var k = f.parent_id || "_";
+        (byParent[k] = byParent[k] || []).push(f);
+      });
+      var convByFolder = {};
+      state.conversations.forEach(function (c) {
+        var k = c.folder_id || "_";
+        (convByFolder[k] = convByFolder[k] || []).push(c);
+      });
+
+      function drawFolder(f, depth) {
+        var row = document.createElement("div");
+        row.className = "tree-row folder";
+        row.style.paddingLeft = (8 + depth * 12) + "px";
+
+        var twist = document.createElement("span");
+        twist.className = "twist";
+        twist.textContent = state.open[f.id] ? "▾" : "▸";
+        row.appendChild(twist);
+
+        var name = document.createElement("span");
+        name.className = "tree-name";
+        name.textContent = f.name;
+        row.appendChild(name);
+
+        var more = document.createElement("button");
+        more.className = "tree-more";
+        more.type = "button";
+        more.textContent = "⋯";
+        more.setAttribute("aria-label", f.name);
+        more.addEventListener("click", function (e) {
+          e.stopPropagation();
+          openMenu(more, [
+            { label: t("newChatLabel", "New conversation"), run: function () { newChat(f.id); } },
+            { label: t("newFolderLabel", "New folder"), run: function () { newFolder(f.id); } },
+            { sep: true },
+            { label: t("renameLabel", "Rename"), run: function () { renameFolder(f); } },
+            { head: t("moveLabel", "Move to") },
+          ].concat(moveTargets(f.id).map(function (target) {
+            return { label: target.name, run: function () {
+              api("/api/folders/move", { id: f.id, parent_id: target.id }).then(load);
+            } };
+          })).concat([
+            { sep: true },
+            { label: t("deleteLabel", "Delete"), run: function () {
+              api("/api/folders/delete", { id: f.id }).then(load);
+            } },
+          ]));
+        });
+        row.appendChild(more);
+
+        row.addEventListener("click", function () {
+          state.open[f.id] = !state.open[f.id];
+          render();
+        });
+        tree.appendChild(row);
+
+        if (!state.open[f.id]) return;
+        (byParent[f.id] || []).forEach(function (child) { drawFolder(child, depth + 1); });
+        (convByFolder[f.id] || []).forEach(function (c) { drawConversation(c, depth + 1); });
+      }
+
+      function drawConversation(c, depth) {
+        var row = document.createElement("div");
+        row.className = "tree-row" + (c.id === state.current ? " current" : "");
+        row.style.paddingLeft = (20 + depth * 12) + "px";
+
+        var name = document.createElement("span");
+        name.className = "tree-name";
+        name.textContent = c.title || t("untitledLabel", "Untitled");
+        row.appendChild(name);
+
+        var more = document.createElement("button");
+        more.className = "tree-more";
+        more.type = "button";
+        more.textContent = "⋯";
+        more.addEventListener("click", function (e) {
+          e.stopPropagation();
+          openMenu(more, [
+            { label: t("renameLabel", "Rename"), run: function () { renameChat(c); } },
+            { head: t("moveLabel", "Move to") },
+          ].concat(moveTargets(null).map(function (target) {
+            return { label: target.name, run: function () {
+              api("/api/conversations/move", { id: c.id, folder_id: target.id }).then(load);
+            } };
+          })).concat([
+            { sep: true },
+            { label: t("deleteLabel", "Delete"), run: function () {
+              if (!confirm(t("deleteChatConfirm", "Delete this conversation?"))) return;
+              api("/api/conversations/delete", { id: c.id }).then(function () {
+                if (state.current === c.id) { state.current = null; }
+                load();
+              });
+            } },
+          ]));
+        });
+        row.appendChild(more);
+
+        row.addEventListener("click", function () { open(c.id); });
+        tree.appendChild(row);
+      }
+
+      (byParent._ || []).forEach(function (f) { drawFolder(f, 0); });
+      (convByFolder._ || []).forEach(function (c) { drawConversation(c, 0); });
+
+      if (!state.folders.length && !state.conversations.length) {
+        var empty = document.createElement("div");
+        empty.className = "side-empty";
+        empty.textContent = t("newChatLabel", "New conversation");
+        tree.appendChild(empty);
+      }
+      paintTitle();
+    }
+
+    function paintTitle() {
+      var c = state.conversations.filter(function (x) { return x.id === state.current; })[0];
+      titleEl.textContent = c ? (c.title || t("untitledLabel", "Untitled")) : "";
+    }
+
+    function renameFolder(f) {
+      var name = prompt(t("folderNamePrompt", "Folder name"), f.name);
+      if (name == null) return;
+      api("/api/folders/rename", { id: f.id, name: name }).then(load);
+    }
+    function renameChat(c) {
+      var title = prompt(t("renameLabel", "Rename"), c.title || "");
+      if (title == null) return;
+      api("/api/conversations/rename", { id: c.id, title: title }).then(load);
+    }
+    function newFolder(parentId) {
+      var name = prompt(t("folderNamePrompt", "Folder name"), t("newFolderLabel", "New folder"));
+      if (name == null) return;
+      api("/api/folders/new", { name: name, parent_id: parentId || null }).then(function (r) {
+        if (r && r.id) state.open[r.id] = true;
+        load();
+      });
+    }
+    function newChat(folderId) {
+      api("/api/conversations/new", { folder_id: folderId || null }).then(function (r) {
+        if (!r || !r.id) return;
+        state.current = r.id;
+        window.__allaConversation = r.id;
+        resetTranscript();
+        load();
+      });
+    }
+
+    // Opening a thread replaces what is on screen, so the window always shows
+    // one conversation and never two spliced together.
+    function open(id) {
+      state.current = id;
+      window.__allaConversation = id;
+      fetch("/api/history?c=" + encodeURIComponent(id))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          resetTranscript();
+          if (data && data.messages && data.messages.length) {
+            window.__allaPaint(data.messages);
+          } else {
+            addMessage("agent", T.greeting);
+          }
+          paintTitle();
+          render();
+          if (window.innerWidth <= 720) chatEl.classList.remove("side-open");
+        })
+        .catch(function () {});
+    }
+
+    function resetTranscript() {
+      scrollEl.innerHTML = "";
+      history.length = 0;
+    }
+
+    function load() {
+      return api("/api/threads").then(function (data) {
+        if (!data || !data.signedIn) return false;
+        state.folders = data.folders || [];
+        state.conversations = data.conversations || [];
+        if (!state.current) state.current = data.current || null;
+        window.__allaConversation = state.current;
+        // A folder holding the open conversation starts expanded, so the
+        // current thread is never hidden behind a closed triangle.
+        var cur = state.conversations.filter(function (c) { return c.id === state.current; })[0];
+        var at = cur && cur.folder_id;
+        while (at) {
+          state.open[at] = true;
+          var parent = state.folders.filter(function (f) { return f.id === at; })[0];
+          at = parent && parent.parent_id;
+        }
+        render();
+        return true;
+      }).catch(function () { return false; });
+    }
+
+    function enable() {
+      side.hidden = false;
+      bar.hidden = false;
+      document.getElementById("side-title").textContent = t("threadsTitle", "Conversations");
+      document.getElementById("side-toggle").addEventListener("click", function () {
+        chatEl.classList.toggle("side-open");
+      });
+      document.getElementById("new-chat").addEventListener("click", function () { newChat(null); });
+      document.getElementById("new-folder").addEventListener("click", function () { newFolder(null); });
+      if (window.innerWidth > 720) chatEl.classList.add("side-open");
+      return load();
+    }
+
+    return { enable: enable, refresh: load, setCurrent: function (id) { state.current = id; } };
+  })();
+
+  // ---------- picking the conversation back up ----------
+  //
+  // Until now the whole conversation lived in this one array in this one tab:
+  // a reload wiped it, and a phone knew nothing of a laptop. Two different
+  // stores fix that, because they answer to two different identities.
+  //
+  //   * Signed in — the thread is on the server, under the account, so it is
+  //     the same thread on every device the person signs in from.
+  //   * Signed out — kept in this browser only. A signed-out visitor is
+  //     identified by nothing that survives a day or distinguishes them from
+  //     the next person on the same network, so there is no honest way to
+  //     carry their conversation to another device. That needs an account.
+  (function restoreConversation() {
+    var LOCAL_KEY = "alla:thread";
+    var LOCAL_MAX = 40;         // exchanges kept in the browser
+    var LOCAL_TTL = 30 * 86400 * 1000;
+
+    // Also used by the sidebar when the client opens a different thread.
+    window.__allaPaint = paint;
+
+    function paint(items) {
+      if (!items.length) return;
+      // The greeting was the opening of a conversation that is already under
+      // way, so it goes.
+      scrollEl.innerHTML = "";
+      for (var i = 0; i < items.length; i++) {
+        var role = items[i].role === "assistant" ? "agent" : items[i].role;
+        if (role !== "user" && role !== "agent") continue;
+        addMessage(role, items[i].content);
+        history.push({ role: items[i].role === "agent" ? "assistant" : items[i].role,
+                       content: items[i].content });
+      }
+      if (history.length > MAX_TURNS) history = history.slice(history.length - MAX_TURNS);
+      if (window.__allaFitChat) window.__allaFitChat(false);
+      scrollEl.scrollTop = scrollEl.scrollHeight;
+    }
+
+    function readLocal() {
+      try {
+        var raw = localStorage.getItem(LOCAL_KEY);
+        if (!raw) return [];
+        var saved = JSON.parse(raw);
+        if (!saved || !Array.isArray(saved.messages)) return [];
+        if (saved.at && Date.now() - saved.at > LOCAL_TTL) return [];
+        return saved.messages;
+      } catch (e) { return []; }
+    }
+
+    function writeLocal() {
+      try {
+        var keep = history.slice(-LOCAL_MAX);
+        localStorage.setItem(LOCAL_KEY, JSON.stringify({ at: Date.now(), messages: keep }));
+      } catch (e) { /* private window, blocked storage — the chat still works */ }
+    }
+
+    // Every send() updates whichever store applies. Set before the fetch
+    // below resolves, so nothing said in the meantime is lost.
+    var signedIn = false;
+    window.__allaRemember = function () { if (!signedIn) writeLocal(); };
+
+    fetch("/api/history", { headers: { accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) { paint(readLocal()); return; }
+        signedIn = !!data.signedIn;
+        if (signedIn) {
+          // The server's copy is the authority for an account; anything this
+          // browser kept while signed out is not this person's thread.
+          if (history.length === 0) paint(data.messages || []);
+          try { localStorage.removeItem(LOCAL_KEY); } catch (e) {}
+          Threads.enable();
+        } else if (history.length === 0) {
+          paint(readLocal());
+        }
+      })
+      .catch(function () { if (history.length === 0) paint(readLocal()); });
+  })();
 })();
 </script>
 

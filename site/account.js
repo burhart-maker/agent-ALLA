@@ -52,7 +52,15 @@
   // ---------------------------------------------------------------- render
 
   function render(a) {
-    // The whole cabinet only makes sense once the billing layer is live.
+    // Data rights are not a billing feature. Whether or not subscriptions are
+    // switched on, anyone signed in can read, correct and erase what is held
+    // about them — so this runs before the branch below returns early.
+    if (a && a.signedIn) {
+      show($("data-card"), true);
+      loadProfileNote();
+    }
+
+    // The rest of the cabinet only makes sense once the billing layer is live.
     if (!a || a.billingEnabled === false) {
       subtitle.textContent = "Alla is open to everyone right now.";
       show(offline, true);
@@ -209,6 +217,83 @@
         $("name-save").disabled = false;
         say(acctMsg, "Couldn't reach the server — please try again.", true);
       });
+  });
+
+  // ---- what Alla remembers, and the right to change or delete it ----
+
+  function loadProfileNote() {
+    api("/api/account/profile")
+      .then(function (r) {
+        // api() wraps every response as {status, ok, body} and resolves even
+        // on an error status, so both have to be checked here.
+        if (r && r.ok && r.body && typeof r.body.facts === "string") {
+          $("profile-text").value = r.body.facts;
+        }
+      })
+      .catch(function () {});
+  }
+
+  $("profile-save").addEventListener("click", function () {
+    var msg = $("profile-msg");
+    say(msg, "Saving…");
+    api("/api/account/profile", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ facts: $("profile-text").value }),
+    })
+      .then(function (r) {
+        if (r && r.ok) say(msg, "Saved. Alla will work from this from now on.");
+        else say(msg, "That did not save — please try again.", true);
+      })
+      .catch(function () { say(msg, "That did not save — please try again.", true); });
+  });
+
+  $("profile-clear").addEventListener("click", function () {
+    if (!confirm("Clear everything Alla remembers about you? She will start again from what you tell her next.")) return;
+    var msg = $("profile-msg");
+    api("/api/account/profile", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ facts: "" }),
+    })
+      .then(function (r) {
+        if (r && r.ok) { $("profile-text").value = ""; say(msg, "Cleared."); }
+        else say(msg, "That did not clear — please try again.", true);
+      })
+      .catch(function () { say(msg, "That did not clear — please try again.", true); });
+  });
+
+  $("data-export").addEventListener("click", function () {
+    // A plain download, so the file lands where the person keeps files rather
+    // than in a browser tab they have to save by hand.
+    var a = document.createElement("a");
+    a.href = "/api/account/data";
+    a.download = "agent-alla-my-data.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  $("data-forget").addEventListener("click", function () {
+    var msg = $("data-msg");
+    var typed = prompt(
+      "This erases your conversations, folders, saved reports and the note Alla keeps on you. " +
+      "It cannot be undone.\n\nType DELETE to confirm."
+    );
+    if (typed == null) return;
+    if (typed.trim() !== "DELETE") { say(msg, "Not erased — the word did not match.", true); return; }
+    say(msg, "Erasing…");
+    api("/api/account/forget", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ confirm: "DELETE" }),
+    })
+      .then(function (r) {
+        if (!r || !r.ok) { say(msg, "That did not go through — please try again.", true); return; }
+        $("profile-text").value = "";
+        say(msg, "Erased. Your account is still here — Alla simply starts again.");
+      })
+      .catch(function () { say(msg, "That did not go through — please try again.", true); });
   });
 
   $("logout-btn").addEventListener("click", function () {

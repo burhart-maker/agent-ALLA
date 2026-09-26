@@ -241,6 +241,40 @@
     <p class="msg" id="acct-msg"></p>
   </section>
 
+  <!-- Articles 15, 16 and 17 of the GDPR, as three buttons rather than an
+       email address. Alla keeps a standing note on each client and a
+       transcript of what they said; the person it is about is entitled to
+       read it, fix it, and have it gone. -->
+  <section class="card" id="data-card" hidden>
+    <h2>What Alla remembers about you</h2>
+    <p class="note">
+      Alla keeps a short note so she does not have to ask you the same things
+      twice. It is what you told her, in her words — not verified fact. Edit
+      it or clear it whenever you like; she will keep adding to it as you talk.
+    </p>
+    <textarea id="profile-text" rows="8" spellcheck="false"
+      style="width:100%;box-sizing:border-box;font:inherit;font-size:14px;line-height:1.5;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);resize:vertical"
+      placeholder="Nothing yet — she writes this as you talk."></textarea>
+    <div class="actions">
+      <button class="btn secondary" type="button" id="profile-save">Save changes</button>
+      <button class="btn secondary" type="button" id="profile-clear">Clear the note</button>
+    </div>
+    <p class="msg" id="profile-msg"></p>
+
+    <h2 style="margin-top:22px">Your data</h2>
+    <div class="actions">
+      <button class="btn secondary" type="button" id="data-export">Download everything Alla holds</button>
+      <button class="btn secondary" type="button" id="data-forget">Erase my conversations and note</button>
+    </div>
+    <p class="note">
+      Erasing removes your conversations, your folders, the note above and your
+      saved reports, and cannot be undone. Your account stays, so you can carry
+      on using Alla. Billing records are kept because accounting law requires
+      it, with the link to you removed.
+    </p>
+    <p class="msg" id="data-msg"></p>
+  </section>
+
   <section class="card" id="plans" hidden>
     <h2>Choose a plan</h2>
     <div class="plan-grid">
