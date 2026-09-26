@@ -110,3 +110,78 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
   ('price_id_standard',       ''),       -- Stripe price id, set after Stripe setup
   ('price_id_pro',            ''),
   ('billing_enabled',         '0');      -- 0 = preview: nothing is charged, limits still counted
+
+-- ---------------------------------------------------------------
+-- Memory (v66). A transcript the client can pick up on any device
+-- they sign in from, and a standing note about them that survives
+-- the transcript being trimmed.
+--
+-- Signed-in clients only: the anonymous key is sha256(ip|day), which
+-- is shared with everyone behind the same router and gone tomorrow,
+-- so it cannot carry a memory. A signed-out visitor's thread is kept
+-- in their own browser and never reaches this database.
+-- ---------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS conversations (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  started_at  INTEGER NOT NULL,
+  last_at     INTEGER NOT NULL,
+  title       TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id, last_at DESC);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id TEXT NOT NULL,
+  role            TEXT NOT NULL,          -- 'user' | 'assistant'
+  content         TEXT NOT NULL,
+  at              INTEGER NOT NULL,
+  FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, id);
+
+-- Rewritten in full by the background note-keeper after each exchange,
+-- never appended to, so it stays a short current picture.
+CREATE TABLE IF NOT EXISTS client_profile (
+  user_id     TEXT PRIMARY KEY,
+  facts       TEXT NOT NULL,
+  updated_at  INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- ---------------------------------------------------------------
+-- Folders (v67). A client is not one conversation: a plot in Son
+-- Parc, a reform in Maó and a mortgage question are three threads,
+-- and mixing them makes all three worse.
+--
+-- Deleting a folder never deletes a conversation — everything
+-- inside moves up one level instead.
+-- ---------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS folders (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  parent_id   TEXT,                    -- NULL = top level
+  name        TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_folders_user ON folders(user_id, parent_id);
+
+-- conversations gained: folder_id TEXT   (NULL = top level)
+
+-- Generated memoranda, so a client can find one again without
+-- scrolling back through the conversation that produced it. The
+-- file itself lives in R2 under the same id.
+CREATE TABLE IF NOT EXISTS reports (
+  id               TEXT PRIMARY KEY,   -- also the /r/<id> link
+  user_id          TEXT,
+  conversation_id  TEXT,
+  folder_id        TEXT,
+  title            TEXT,
+  created_at       INTEGER NOT NULL,
+  expires_at       INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id, created_at DESC);
