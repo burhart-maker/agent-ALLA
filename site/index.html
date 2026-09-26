@@ -348,9 +348,7 @@
     border-radius: 20px;
     box-shadow: 0 20px 50px rgba(15,18,22,0.18), 0 2px 8px rgba(15,18,22,0.08);
     display: flex;
-    /* A row, since the card now has a sidebar beside the conversation. The
-       reading column keeps its own vertical layout in .chat-main. */
-    flex-direction: row;
+    flex-direction: column;
     overflow: hidden;
     position: relative;
   }
@@ -362,19 +360,92 @@
     flex-direction: column;
   }
 
-  /* Folders. Closed by default and absent entirely for a signed-out visitor,
-     so the landing page opens exactly as it did. */
+  /* Projects & chats.
+     An OVERLAY, not a column: it is fixed to the viewport and slides over the
+     page. Opening it must never move or narrow the conversation — the reading
+     column keeps its width and its position whatever the panel is doing, so
+     there is no reflow and nothing jumps. The panel takes no part in the
+     page's layout at all.
+     No colours of its own: it uses the same tokens as everything else, so it
+     follows the device's light/dark setting through prefers-color-scheme. */
+  .side-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(12,16,20,0.34);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+    z-index: 40;
+  }
+  body.side-open .side-scrim { opacity: 1; pointer-events: auto; }
+
   .chat-side {
-    flex: 0 0 0;
-    width: 0;
-    overflow: hidden;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(320px, 86vw);
     display: flex;
     flex-direction: column;
     background: var(--paper);
     border-right: 1px solid var(--line);
-    transition: flex-basis 200ms ease, width 200ms ease;
+    box-shadow: 10px 0 34px rgba(12,16,20,0.16);
+    transform: translateX(-102%);
+    transition: transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    z-index: 41;
   }
-  .chat.side-open .chat-side { flex-basis: 236px; width: 236px; }
+  body.side-open .chat-side { transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .chat-side, .side-scrim { transition: none; }
+  }
+
+  /* The two floating controls. There is no header bar on this page and adding
+     one would change a composition that was tuned deliberately, so these sit
+     in the corners instead: the panel on the left, the account on the right,
+     where every hand already reaches for them. */
+  .corner-btn {
+    position: fixed;
+    top: 14px;
+    z-index: 42;
+    display: none;                /* shown once we know who is here */
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--paper-raised);
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(15,18,22,0.10);
+    text-decoration: none;
+  }
+  .corner-btn:hover { background: var(--accent-soft); }
+  .corner-btn.on { display: inline-flex; }
+  #side-toggle { left: 14px; width: 38px; padding: 0; justify-content: center; }
+  #corner-account { right: 14px; }
+  .avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    margin: 0 -6px 0 -4px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  @media (max-width: 640px) {
+    .corner-btn { top: 10px; }
+    #side-toggle { left: 10px; }
+    #corner-account { right: 10px; padding: 0 8px; }
+    #corner-account .acct-text { display: none; }
+  }
 
   .side-head {
     display: flex;
@@ -486,18 +557,7 @@
   }
   .icon-btn-sm { width: 30px; height: 30px; }
 
-  /* On a phone the folders cover the conversation rather than squeezing it. */
-  @media (max-width: 720px) {
-    .chat.side-open .chat-side {
-      position: absolute;
-      top: 0; bottom: 0; left: 0;
-      width: 78%;
-      max-width: 290px;
-      flex-basis: auto;
-      z-index: 6;
-      box-shadow: 8px 0 24px rgba(15,18,22,0.18);
-    }
-  }
+
 
   /* The chat card can be expanded. The default keeps the hero composition the
      way it was tuned; expanded turns the card into a proper reading window,
@@ -998,6 +1058,29 @@
 </style>
 </head>
 <body>
+
+<div class="side-scrim" id="side-scrim" hidden></div>
+<aside class="chat-side" id="chat-side" hidden>
+  <div class="side-head">
+    <span class="side-title" id="side-title">Conversations</span>
+    <button id="new-folder" class="icon-btn icon-btn-sm" type="button" title="New folder">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M12 10.5v5M9.5 13h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+  <div class="side-tree" id="side-tree"></div>
+</aside>
+<button class="corner-btn" id="side-toggle" type="button" aria-label="Projects and chats" aria-expanded="false">
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+  </svg>
+</button>
+<a class="corner-btn" id="corner-account" href="account.html">
+  <span class="avatar" id="corner-initials" aria-hidden="true"></span>
+  <span class="acct-text" id="corner-text"></span>
+</a>
 
 <section class="hero">
   <div class="hero-bg">
@@ -2460,25 +2543,8 @@
 
 <div class="chat-shell">
   <div class="chat">
-    <aside class="chat-side" id="chat-side" hidden>
-      <div class="side-head">
-        <span class="side-title" id="side-title">Conversations</span>
-        <button id="new-folder" class="icon-btn icon-btn-sm" type="button" title="New folder">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-            <path d="M12 10.5v5M9.5 13h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </div>
-      <div class="side-tree" id="side-tree"></div>
-    </aside>
     <div class="chat-main">
       <div class="chat-bar" id="chat-bar" hidden>
-        <button id="side-toggle" class="icon-btn icon-btn-sm" type="button" title="Conversations">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
-          </svg>
-        </button>
         <span class="chat-title" id="chat-title"></span>
         <button id="new-chat" class="icon-btn icon-btn-sm" type="button" title="New conversation">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -3862,7 +3928,9 @@
       micErrorRateLimited: 'Too many voice messages in a row — try again in a few minutes.',
       micErrorNoSpeech: 'Alla didn\'t catch any speech — try again, a bit closer to the microphone.',
       micErrorService: 'Speech recognition is unavailable right now — this is on our side, not yours. Please type instead.',
-      threadsTitle: 'Conversations',
+      threadsTitle: 'Projects & chats',
+      newProjectLabel: 'New project',
+      signInLabel: 'Sign in',
       newChatLabel: 'New conversation',
       newFolderLabel: 'New folder',
       renameLabel: 'Rename',
@@ -3872,7 +3940,7 @@
       untitledLabel: 'Untitled',
       signInForThreads: 'Sign in to keep your conversations and sort them into folders.',
       deleteChatConfirm: 'Delete this conversation? This cannot be undone.',
-      folderNamePrompt: 'Folder name',
+      folderNamePrompt: 'Project name',
       whyH2: 'What actually changes for your business',
       whyPrevLabel: 'Previous', whyNextLabel: 'Next',
       card1Title: 'Investment-analyst depth, not listing descriptions',
@@ -3940,7 +4008,9 @@
       micErrorRateLimited: 'Demasiados mensajes de voz seguidos — inténtalo de nuevo en unos minutos.',
       micErrorNoSpeech: 'Alla no captó ninguna voz — inténtalo otra vez, más cerca del micrófono.',
       micErrorService: 'El reconocimiento de voz no está disponible ahora mismo — es cosa nuestra, no tuya. Escribe tu mensaje, por favor.',
-      threadsTitle: 'Conversaciones',
+      threadsTitle: 'Proyectos y chats',
+      newProjectLabel: 'Nuevo proyecto',
+      signInLabel: 'Iniciar sesión',
       newChatLabel: 'Nueva conversación',
       newFolderLabel: 'Nueva carpeta',
       renameLabel: 'Renombrar',
@@ -3950,7 +4020,7 @@
       untitledLabel: 'Sin título',
       signInForThreads: 'Inicia sesión para guardar tus conversaciones y ordenarlas en carpetas.',
       deleteChatConfirm: '¿Eliminar esta conversación? No se puede deshacer.',
-      folderNamePrompt: 'Nombre de la carpeta',
+      folderNamePrompt: 'Nombre del proyecto',
       whyH2: 'Lo que realmente cambia para tu negocio',
       whyPrevLabel: 'Anterior', whyNextLabel: 'Siguiente',
       card1Title: 'Profundidad de analista de inversión, no descripciones de anuncio',
@@ -4018,7 +4088,9 @@
       micErrorRateLimited: 'Слишком много голосовых подряд — попробуйте через несколько минут.',
       micErrorNoSpeech: 'Алла не расслышала речь — попробуйте ещё раз, ближе к микрофону.',
       micErrorService: 'Распознавание речи сейчас недоступно — это на нашей стороне, не у вас. Напишите сообщение текстом.',
-      threadsTitle: 'Разговоры',
+      threadsTitle: 'Проекты и чаты',
+      newProjectLabel: 'Новый проект',
+      signInLabel: 'Войти',
       newChatLabel: 'Новый разговор',
       newFolderLabel: 'Новая папка',
       renameLabel: 'Переименовать',
@@ -4028,7 +4100,7 @@
       untitledLabel: 'Без названия',
       signInForThreads: 'Войдите, чтобы разговоры сохранялись и раскладывались по папкам.',
       deleteChatConfirm: 'Удалить этот разговор? Это необратимо.',
-      folderNamePrompt: 'Название папки',
+      folderNamePrompt: 'Название проекта',
       whyH2: 'Что реально меняется для вашего бизнеса',
       whyPrevLabel: 'Назад', whyNextLabel: 'Вперёд',
       card1Title: 'Глубина инвестиционного аналитика, а не описание объявления',
@@ -4096,7 +4168,9 @@
       micErrorRateLimited: 'Zu viele Sprachnachrichten hintereinander — bitte in ein paar Minuten erneut versuchen.',
       micErrorNoSpeech: 'Alla hat keine Sprache gehört — bitte noch einmal, näher am Mikrofon.',
       micErrorService: 'Die Spracherkennung ist gerade nicht verfügbar — das liegt an uns, nicht an Ihnen. Bitte tippen Sie Ihre Nachricht.',
-      threadsTitle: 'Gespräche',
+      threadsTitle: 'Projekte & Chats',
+      newProjectLabel: 'Neues Projekt',
+      signInLabel: 'Anmelden',
       newChatLabel: 'Neues Gespräch',
       newFolderLabel: 'Neuer Ordner',
       renameLabel: 'Umbenennen',
@@ -4106,7 +4180,7 @@
       untitledLabel: 'Ohne Titel',
       signInForThreads: 'Melden Sie sich an, um Gespräche zu behalten und in Ordnern zu sortieren.',
       deleteChatConfirm: 'Dieses Gespräch löschen? Das lässt sich nicht rückgängig machen.',
-      folderNamePrompt: 'Ordnername',
+      folderNamePrompt: 'Projektname',
       whyH2: 'Was sich für Ihr Geschäft wirklich ändert',
       whyPrevLabel: 'Zurück', whyNextLabel: 'Weiter',
       card1Title: 'Tiefe eines Investmentanalysten, keine Anzeigenbeschreibung',
@@ -4174,7 +4248,9 @@
       micErrorRateLimited: 'Trop de messages vocaux d\'affilée — réessayez dans quelques minutes.',
       micErrorNoSpeech: 'Alla n\'a rien entendu — réessayez, plus près du micro.',
       micErrorService: "La reconnaissance vocale est indisponible pour le moment — cela vient de nous, pas de vous. Écrivez votre message.",
-      threadsTitle: 'Conversations',
+      threadsTitle: 'Projets et discussions',
+      newProjectLabel: 'Nouveau projet',
+      signInLabel: 'Se connecter',
       newChatLabel: 'Nouvelle conversation',
       newFolderLabel: 'Nouveau dossier',
       renameLabel: 'Renommer',
@@ -4184,7 +4260,7 @@
       untitledLabel: 'Sans titre',
       signInForThreads: 'Connectez-vous pour conserver vos conversations et les classer en dossiers.',
       deleteChatConfirm: 'Supprimer cette conversation ? C\'est irréversible.',
-      folderNamePrompt: 'Nom du dossier',
+      folderNamePrompt: 'Nom du projet',
       whyH2: 'Ce qui change réellement pour votre activité',
       whyPrevLabel: 'Précédent', whyNextLabel: 'Suivant',
       card1Title: "Profondeur d'analyste en investissement, pas une description d'annonce",
@@ -4252,7 +4328,9 @@
       micErrorRateLimited: 'Demasiadas mensagens de voz seguidas — tente novamente daqui a alguns minutos.',
       micErrorNoSpeech: 'A Alla não captou nenhuma fala — tente de novo, mais perto do microfone.',
       micErrorService: 'O reconhecimento de voz está indisponível de momento — o problema é nosso, não seu. Escreva a sua mensagem.',
-      threadsTitle: 'Conversas',
+      threadsTitle: 'Projetos e conversas',
+      newProjectLabel: 'Novo projeto',
+      signInLabel: 'Iniciar sessão',
       newChatLabel: 'Nova conversa',
       newFolderLabel: 'Nova pasta',
       renameLabel: 'Mudar o nome',
@@ -4262,7 +4340,7 @@
       untitledLabel: 'Sem título',
       signInForThreads: 'Inicie sessão para guardar as conversas e organizá-las em pastas.',
       deleteChatConfirm: 'Eliminar esta conversa? Não é reversível.',
-      folderNamePrompt: 'Nome da pasta',
+      folderNamePrompt: 'Nome do projeto',
       whyH2: 'O que realmente muda para o seu negócio',
       whyPrevLabel: 'Anterior', whyNextLabel: 'Seguinte',
       card1Title: 'Profundidade de analista de investimento, não descrições de anúncio',
@@ -4330,7 +4408,9 @@
       micErrorRateLimited: 'Troppi messaggi vocali di fila — riprova tra qualche minuto.',
       micErrorNoSpeech: 'Alla non ha sentito parlato — riprova, più vicino al microfono.',
       micErrorService: 'Il riconoscimento vocale non è disponibile al momento — dipende da noi, non da te. Scrivi pure il messaggio.',
-      threadsTitle: 'Conversazioni',
+      threadsTitle: 'Progetti e chat',
+      newProjectLabel: 'Nuovo progetto',
+      signInLabel: 'Accedi',
       newChatLabel: 'Nuova conversazione',
       newFolderLabel: 'Nuova cartella',
       renameLabel: 'Rinomina',
@@ -4340,7 +4420,7 @@
       untitledLabel: 'Senza titolo',
       signInForThreads: 'Accedi per conservare le conversazioni e ordinarle in cartelle.',
       deleteChatConfirm: 'Eliminare questa conversazione? Non è reversibile.',
-      folderNamePrompt: 'Nome della cartella',
+      folderNamePrompt: 'Nome del progetto',
       whyH2: 'Cosa cambia davvero per la tua attività',
       whyPrevLabel: 'Precedente', whyNextLabel: 'Successivo',
       card1Title: 'Profondità da analista di investimento, non descrizioni da annuncio',
@@ -4378,6 +4458,9 @@
 
   var LANG = detectLang();
   var T = STRINGS[LANG];
+  // The account control lives in its own block further down and still
+  // needs the chosen language.
+  window.__allaT = T;
   document.documentElement.lang = LANG;
   // The install bar lives in its own script (it has nothing to do with the
   // chat) but shares this dictionary rather than carrying a second copy.
@@ -5328,7 +5411,7 @@
           e.stopPropagation();
           openMenu(more, [
             { label: t("newChatLabel", "New conversation"), run: function () { newChat(f.id); } },
-            { label: t("newFolderLabel", "New folder"), run: function () { newFolder(f.id); } },
+            { label: t("newProjectLabel", "New project"), run: function () { newFolder(f.id); } },
             { sep: true },
             { label: t("renameLabel", "Rename"), run: function () { renameFolder(f); } },
             { head: t("moveLabel", "Move to") },
@@ -5414,7 +5497,7 @@
     }
 
     function renameFolder(f) {
-      var name = prompt(t("folderNamePrompt", "Folder name"), f.name);
+      var name = prompt(t("folderNamePrompt", "Project name"), f.name);
       if (name == null) return;
       api("/api/folders/rename", { id: f.id, name: name }).then(load);
     }
@@ -5424,7 +5507,7 @@
       api("/api/conversations/rename", { id: c.id, title: title }).then(load);
     }
     function newFolder(parentId) {
-      var name = prompt(t("folderNamePrompt", "Folder name"), t("newFolderLabel", "New folder"));
+      var name = prompt(t("folderNamePrompt", "Project name"), t("newProjectLabel", "New project"));
       if (name == null) return;
       api("/api/folders/new", { name: name, parent_id: parentId || null }).then(function (r) {
         if (r && r.id) state.open[r.id] = true;
@@ -5457,7 +5540,7 @@
           }
           paintTitle();
           render();
-          if (window.innerWidth <= 720) chatEl.classList.remove("side-open");
+          if (window.__allaClosePanel) window.__allaClosePanel();
         })
         .catch(function () {});
     }
@@ -5491,13 +5574,25 @@
     function enable() {
       side.hidden = false;
       bar.hidden = false;
-      document.getElementById("side-title").textContent = t("threadsTitle", "Conversations");
-      document.getElementById("side-toggle").addEventListener("click", function () {
-        chatEl.classList.toggle("side-open");
+      document.getElementById("side-title").textContent = t("threadsTitle", "Projects & chats");
+      var scrim = document.getElementById("side-scrim");
+      var toggle = document.getElementById("side-toggle");
+      function setPanel(open) {
+        document.body.classList.toggle("side-open", open);
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        if (scrim) scrim.hidden = false;
+      }
+      toggle.classList.add("on");
+      toggle.addEventListener("click", function () {
+        setPanel(!document.body.classList.contains("side-open"));
       });
+      if (scrim) scrim.addEventListener("click", function () { setPanel(false); });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && document.body.classList.contains("side-open")) setPanel(false);
+      });
+      window.__allaClosePanel = function () { setPanel(false); };
       document.getElementById("new-chat").addEventListener("click", function () { newChat(null); });
       document.getElementById("new-folder").addEventListener("click", function () { newFolder(null); });
-      if (window.innerWidth > 720) chatEl.classList.add("side-open");
       return load();
     }
 
@@ -5605,7 +5700,7 @@
 </script>
 
 <script>
-  // ===== Footer account slot =====
+  // ===== The account controls: the circle in the corner, and the footer =====
   // Asks the server who is signed in. While nobody is (or while the billing
   // layer is still switched off, or the endpoint is not deployed yet) the
   // slot stays hidden and the footer looks exactly as it did.
@@ -5613,16 +5708,46 @@
     "use strict";
     var link = document.getElementById("footer-account");
     var sep = document.getElementById("footer-sep");
-    if (!link) return;
+    var corner = document.getElementById("corner-account");
+    var initials = document.getElementById("corner-initials");
+    var cornerText = document.getElementById("corner-text");
+
+    // Two letters from a name, one from an email — enough to recognise your
+    // own account at a glance, and it never needs an uploaded picture.
+    function initialsOf(name, email) {
+      var src = (name || "").trim();
+      if (src) {
+        var parts = src.split(/\s+/).slice(0, 2);
+        return parts.map(function (w) { return w.charAt(0); }).join("").toUpperCase();
+      }
+      return (email || "?").charAt(0).toUpperCase();
+    }
+
+    function showCorner(signedIn, a) {
+      if (!corner) return;
+      if (signedIn) {
+        initials.textContent = initialsOf(a.name, a.email);
+        initials.style.display = "";
+        cornerText.textContent = a.name || a.email;
+        corner.title = a.name || a.email;
+      } else {
+        initials.style.display = "none";
+        cornerText.textContent = (window.__allaT || {}).signInLabel || "Sign in";
+        corner.title = (window.__allaT || {}).signInLabel || "Sign in";
+      }
+      corner.classList.add("on");
+    }
+
     fetch("/api/account", { credentials: "same-origin" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (a) {
-        if (!a || !a.signedIn) return;
+        if (!a || !a.signedIn) { showCorner(false, {}); return; }
         link.textContent = a.name || a.email;
         link.hidden = false;
         if (sep) sep.hidden = false;
+        showCorner(true, a);
       })
-      .catch(function () {});
+      .catch(function () { showCorner(false, {}); });
   })();
 </script>
 
