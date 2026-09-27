@@ -377,7 +377,7 @@
     transition: opacity 200ms ease;
     z-index: 40;
   }
-  body.side-open .side-scrim { opacity: 1; pointer-events: auto; }
+  .side-scrim.open { opacity: 1; pointer-events: auto; }
 
   .chat-side {
     position: fixed;
@@ -394,7 +394,10 @@
     transition: transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
     z-index: 41;
   }
-  body.side-open .chat-side { transform: none; }
+  /* The open state is a class on the panel itself rather than a descendant
+     selector hanging off <body>. One less thing between the click and the
+     movement, and it cannot be defeated by anything that touches the body. */
+  .chat-side.open { transform: translateX(0) !important; }
   @media (prefers-reduced-motion: reduce) {
     .chat-side, .side-scrim { transition: none; }
   }
@@ -5633,7 +5636,9 @@
       var toggle = document.getElementById("side-toggle");
       if (!toggle) return;
       function setPanel(open) {
-        document.body.classList.toggle("side-open", open);
+        side.classList.toggle("open", open);
+        if (scrim) scrim.classList.toggle("open", open);
+        document.body.classList.toggle("side-open", open);   // for anything else that asks
         toggle.setAttribute("aria-expanded", open ? "true" : "false");
       }
       side.hidden = false;
@@ -5641,11 +5646,11 @@
       toggle.classList.add("on");
       toggle.setAttribute("title", t("threadsTitle", "Projects & chats"));
       toggle.addEventListener("click", function () {
-        setPanel(!document.body.classList.contains("side-open"));
+        setPanel(!side.classList.contains("open"));
       });
       if (scrim) scrim.addEventListener("click", function () { setPanel(false); });
       document.addEventListener("keydown", function (e) {
-        if (e.key === "Escape" && document.body.classList.contains("side-open")) setPanel(false);
+        if (e.key === "Escape" && side.classList.contains("open")) setPanel(false);
       });
       window.__allaClosePanel = function () { setPanel(false); };
 
