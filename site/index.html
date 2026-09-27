@@ -368,16 +368,10 @@
      page's layout at all.
      No colours of its own: it uses the same tokens as everything else, so it
      follows the device's light/dark setting through prefers-color-scheme. */
-  .side-scrim {
-    position: fixed;
-    inset: 0;
-    background: rgba(12,16,20,0.34);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 200ms ease;
-    z-index: 40;
-  }
-  .side-scrim.open { opacity: 1; pointer-events: auto; }
+  /* No dimming and nothing covering the page: the panel and the conversation
+     are meant to be used at the same time, so everything behind the panel
+     stays lit and stays clickable. Closing is the same button that opened it,
+     or Escape. */
 
   .chat-side {
     position: fixed;
@@ -399,7 +393,7 @@
      movement, and it cannot be defeated by anything that touches the body. */
   .chat-side.open { transform: translateX(0) !important; }
   @media (prefers-reduced-motion: reduce) {
-    .chat-side, .side-scrim { transition: none; }
+    .chat-side { transition: none; }
   }
 
   /* The two floating controls. There is no header bar on this page and adding
@@ -1083,7 +1077,6 @@
 </head>
 <body>
 
-<div class="side-scrim" id="side-scrim" hidden></div>
 <aside class="chat-side" id="chat-side" hidden>
   <div class="side-head">
     <span class="side-title" id="side-title">Conversations</span>
@@ -5596,7 +5589,7 @@
           }
           paintTitle();
           render();
-          if (window.__allaClosePanel) window.__allaClosePanel();
+          if (window.innerWidth <= 720 && window.__allaClosePanel) window.__allaClosePanel();
         })
         .catch(function () {});
     }
@@ -5632,23 +5625,19 @@
     // top-left corner and you never have to discover it. Gating it on being
     // signed in meant the feature was invisible to the person who owns it.
     function mountPanel() {
-      var scrim = document.getElementById("side-scrim");
       var toggle = document.getElementById("side-toggle");
       if (!toggle) return;
       function setPanel(open) {
         side.classList.toggle("open", open);
-        if (scrim) scrim.classList.toggle("open", open);
         document.body.classList.toggle("side-open", open);   // for anything else that asks
         toggle.setAttribute("aria-expanded", open ? "true" : "false");
       }
       side.hidden = false;
-      if (scrim) scrim.hidden = false;
       toggle.classList.add("on");
       toggle.setAttribute("title", t("threadsTitle", "Projects & chats"));
       toggle.addEventListener("click", function () {
         setPanel(!side.classList.contains("open"));
       });
-      if (scrim) scrim.addEventListener("click", function () { setPanel(false); });
       document.addEventListener("keydown", function (e) {
         if (e.key === "Escape" && side.classList.contains("open")) setPanel(false);
       });
