@@ -503,6 +503,21 @@
   }
   .tree-row:hover .tree-more, .tree-more:focus-visible { opacity: 1; }
   .side-empty { padding: 14px; font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
+  .tree-row.starter { font-weight: 600; margin-bottom: 4px; }
+  .tree-row.starter .twist { font-size: 14px; color: var(--accent); }
+  .side-signin {
+    display: block;
+    margin: 0 14px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+  }
+  .side-signin:hover { background: var(--accent-strong); }
 
   .tree-menu {
     position: absolute;
@@ -966,6 +981,12 @@
   }
   .acct-link:hover { color: #fff; text-decoration-color: #fff; }
   .acct-link[hidden], #footer-sep[hidden] { display: none; }
+
+  /* Any element given an explicit `display` beats the browser's own rule for
+     the `hidden` attribute, so `hidden` silently stopped hiding .chat-bar and
+     .chat-side — which is how a dead "+" ended up floating at the top of the
+     chat for every visitor. This makes `hidden` mean hidden, everywhere. */
+  [hidden] { display: none !important; }
   /* A second way in: the orb is its own link to the same page. It is
      absolutely positioned inside the footer and out of flow, so it shifts
      nothing, and its spot is chosen (and machine-checked at every width) so
@@ -3938,7 +3959,7 @@
       deleteLabel: 'Delete',
       topLevelLabel: 'All conversations',
       untitledLabel: 'Untitled',
-      signInForThreads: 'Sign in to keep your conversations and sort them into folders.',
+      signInForThreads: 'Sign in to keep your chats and sort them into projects.',
       deleteChatConfirm: 'Delete this conversation? This cannot be undone.',
       folderNamePrompt: 'Project name',
       whyH2: 'What actually changes for your business',
@@ -4018,7 +4039,7 @@
       deleteLabel: 'Eliminar',
       topLevelLabel: 'Todas las conversaciones',
       untitledLabel: 'Sin título',
-      signInForThreads: 'Inicia sesión para guardar tus conversaciones y ordenarlas en carpetas.',
+      signInForThreads: 'Inicia sesión para guardar tus chats y ordenarlos en proyectos.',
       deleteChatConfirm: '¿Eliminar esta conversación? No se puede deshacer.',
       folderNamePrompt: 'Nombre del proyecto',
       whyH2: 'Lo que realmente cambia para tu negocio',
@@ -4098,7 +4119,7 @@
       deleteLabel: 'Удалить',
       topLevelLabel: 'Все разговоры',
       untitledLabel: 'Без названия',
-      signInForThreads: 'Войдите, чтобы разговоры сохранялись и раскладывались по папкам.',
+      signInForThreads: 'Войдите, чтобы разговоры сохранялись и раскладывались по проектам.',
       deleteChatConfirm: 'Удалить этот разговор? Это необратимо.',
       folderNamePrompt: 'Название проекта',
       whyH2: 'Что реально меняется для вашего бизнеса',
@@ -4178,7 +4199,7 @@
       deleteLabel: 'Löschen',
       topLevelLabel: 'Alle Gespräche',
       untitledLabel: 'Ohne Titel',
-      signInForThreads: 'Melden Sie sich an, um Gespräche zu behalten und in Ordnern zu sortieren.',
+      signInForThreads: 'Melden Sie sich an, um Gespräche zu behalten und in Projekten zu ordnen.',
       deleteChatConfirm: 'Dieses Gespräch löschen? Das lässt sich nicht rückgängig machen.',
       folderNamePrompt: 'Projektname',
       whyH2: 'Was sich für Ihr Geschäft wirklich ändert',
@@ -4258,7 +4279,7 @@
       deleteLabel: 'Supprimer',
       topLevelLabel: 'Toutes les conversations',
       untitledLabel: 'Sans titre',
-      signInForThreads: 'Connectez-vous pour conserver vos conversations et les classer en dossiers.',
+      signInForThreads: 'Connectez-vous pour conserver vos conversations et les classer par projet.',
       deleteChatConfirm: 'Supprimer cette conversation ? C\'est irréversible.',
       folderNamePrompt: 'Nom du projet',
       whyH2: 'Ce qui change réellement pour votre activité',
@@ -4338,7 +4359,7 @@
       deleteLabel: 'Eliminar',
       topLevelLabel: 'Todas as conversas',
       untitledLabel: 'Sem título',
-      signInForThreads: 'Inicie sessão para guardar as conversas e organizá-las em pastas.',
+      signInForThreads: 'Inicie sessão para guardar as conversas e organizá-las em projetos.',
       deleteChatConfirm: 'Eliminar esta conversa? Não é reversível.',
       folderNamePrompt: 'Nome do projeto',
       whyH2: 'O que realmente muda para o seu negócio',
@@ -4418,7 +4439,7 @@
       deleteLabel: 'Elimina',
       topLevelLabel: 'Tutte le conversazioni',
       untitledLabel: 'Senza titolo',
-      signInForThreads: 'Accedi per conservare le conversazioni e ordinarle in cartelle.',
+      signInForThreads: 'Accedi per conservare le conversazioni e ordinarle in progetti.',
       deleteChatConfirm: 'Eliminare questa conversazione? Non è reversibile.',
       folderNamePrompt: 'Nome del progetto',
       whyH2: 'Cosa cambia davvero per la tua attività',
@@ -5319,6 +5340,7 @@
 
     var state = { folders: [], conversations: [], current: null, open: {} };
     var menu = null;
+    var signedIn = false;
 
     function t(key, fallback) { return T[key] || fallback; }
 
@@ -5376,6 +5398,36 @@
 
     function render() {
       tree.innerHTML = "";
+
+      // First row, always — the same place ChatGPT and Claude put it.
+      var starter = document.createElement("div");
+      starter.className = "tree-row starter";
+      var plusIcon = document.createElement("span");
+      plusIcon.className = "twist";
+      plusIcon.textContent = "+";
+      starter.appendChild(plusIcon);
+      var starterName = document.createElement("span");
+      starterName.className = "tree-name";
+      starterName.textContent = t("newChatLabel", "New chat");
+      starter.appendChild(starterName);
+      starter.addEventListener("click", function () { newChat(null); });
+      tree.appendChild(starter);
+
+      if (!signedIn) {
+        // Honest about why the list is empty, with the one action that fills
+        // it — rather than an empty panel that looks broken.
+        var note = document.createElement("div");
+        note.className = "side-empty";
+        note.textContent = t("signInForThreads",
+          "Sign in to keep your conversations and sort them into projects.");
+        tree.appendChild(note);
+        var go = document.createElement("a");
+        go.className = "side-signin";
+        go.href = "account.html";
+        go.textContent = t("signInLabel", "Sign in");
+        tree.appendChild(go);
+        return;
+      }
       var byParent = {};
       state.folders.forEach(function (f) {
         var k = f.parent_id || "_";
@@ -5482,12 +5534,6 @@
       (byParent._ || []).forEach(function (f) { drawFolder(f, 0); });
       (convByFolder._ || []).forEach(function (c) { drawConversation(c, 0); });
 
-      if (!state.folders.length && !state.conversations.length) {
-        var empty = document.createElement("div");
-        empty.className = "side-empty";
-        empty.textContent = t("newChatLabel", "New conversation");
-        tree.appendChild(empty);
-      }
       paintTitle();
     }
 
@@ -5515,6 +5561,13 @@
       });
     }
     function newChat(folderId) {
+      if (!signedIn) {
+        resetTranscript();
+        addMessage("agent", T.greeting);
+        try { localStorage.removeItem("alla:thread"); } catch (e) {}
+        if (window.__allaClosePanel) window.__allaClosePanel();
+        return;
+      }
       api("/api/conversations/new", { folder_id: folderId || null }).then(function (r) {
         if (!r || !r.id) return;
         state.current = r.id;
@@ -5571,18 +5624,22 @@
       }).catch(function () { return false; });
     }
 
-    function enable() {
-      side.hidden = false;
-      bar.hidden = false;
-      document.getElementById("side-title").textContent = t("threadsTitle", "Projects & chats");
+    // The way in exists for everyone, from the first paint — the way it does
+    // in ChatGPT and in Claude, where the panel button is simply always in the
+    // top-left corner and you never have to discover it. Gating it on being
+    // signed in meant the feature was invisible to the person who owns it.
+    function mountPanel() {
       var scrim = document.getElementById("side-scrim");
       var toggle = document.getElementById("side-toggle");
+      if (!toggle) return;
       function setPanel(open) {
         document.body.classList.toggle("side-open", open);
         toggle.setAttribute("aria-expanded", open ? "true" : "false");
-        if (scrim) scrim.hidden = false;
       }
+      side.hidden = false;
+      if (scrim) scrim.hidden = false;
       toggle.classList.add("on");
+      toggle.setAttribute("title", t("threadsTitle", "Projects & chats"));
       toggle.addEventListener("click", function () {
         setPanel(!document.body.classList.contains("side-open"));
       });
@@ -5591,12 +5648,24 @@
         if (e.key === "Escape" && document.body.classList.contains("side-open")) setPanel(false);
       });
       window.__allaClosePanel = function () { setPanel(false); };
-      document.getElementById("new-chat").addEventListener("click", function () { newChat(null); });
+
+      document.getElementById("side-title").textContent = t("threadsTitle", "Projects & chats");
       document.getElementById("new-folder").addEventListener("click", function () { newFolder(null); });
+      render();
+    }
+
+    // Signing in adds the thread bar and the real tree; the panel itself was
+    // already there.
+    function enable() {
+      signedIn = true;
+      bar.hidden = false;
+      var plus = document.getElementById("new-chat");
+      if (plus) plus.addEventListener("click", function () { newChat(null); });
       return load();
     }
 
-    return { enable: enable, refresh: load, setCurrent: function (id) { state.current = id; } };
+    return { mount: mountPanel, enable: enable, refresh: load,
+             setCurrent: function (id) { state.current = id; } };
   })();
 
   // ---------- picking the conversation back up ----------
@@ -5658,6 +5727,8 @@
     // below resolves, so nothing said in the meantime is lost.
     var signedIn = false;
     window.__allaRemember = function () { if (!signedIn) writeLocal(); };
+
+    Threads.mount();
 
     fetch("/api/history", { headers: { accept: "application/json" } })
       .then(function (r) { return r.ok ? r.json() : null; })
