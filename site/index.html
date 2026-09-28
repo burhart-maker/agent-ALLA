@@ -1003,6 +1003,21 @@
     padding: 0 50px;
   }
 
+  /* Two audiences, said once each above their own row, rather than a label
+     repeated on eleven cards. A buyer should be able to see at a glance that
+     the second row is not addressed to them and stop reading it. */
+  .why-group { margin-top: 30px; }
+  .why-group:first-of-type { margin-top: 18px; }
+  .why-for {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--accent);
+    margin: 0 0 14px;
+    padding-left: 2px;
+  }
+
   .why-track {
     display: flex;
     gap: 16px;
@@ -1304,14 +1319,11 @@
   </svg>
 </button>
 <a class="corner-btn" id="corner-account" href="account.html" aria-label="Account">
-  <!-- The figure fills the circle rather than sitting in the middle of it:
-       at 19px it read as a small person in a large button, which is not what
-       a mark should look like. Drawn slightly larger than the viewBox centre
-       so the shoulders run to the edge and are cropped by the circle, the way
-       a portrait is. -->
-  <svg width="30" height="30" viewBox="2.6 3.2 18.8 18.8" fill="currentColor" aria-hidden="true">
-    <circle cx="12" cy="9.1" r="3.9"/>
-    <path d="M12 14.4c-4.3 0-7.8 2.7-7.8 6.2 0 .5.4.9.9.9h13.8c.5 0 .9-.4.9-.9 0-3.5-3.5-6.2-7.8-6.2z"/>
+  <!-- The ordinary account glyph everyone else uses, at the ordinary
+       proportion: it covers about 53% of the circle, which is where Gmail,
+       GitHub and the rest sit. Nothing invented. -->
+  <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
   </svg>
 </a>
 
@@ -2920,67 +2932,93 @@
 </section>
 
 <section class="why">
-  <h2 id="why-h2">What actually changes for your business</h2>
-  <div class="why-carousel">
-    <button class="why-nav why-prev" id="why-prev" type="button" aria-label="Previous">‹</button>
-    <div class="why-track" id="why-track">
+  <h2 id="why-h2">What actually changes</h2>
+
+  <!-- Two rows, one audience each, because the visitor is either a buyer or
+       an agency and half of this is not addressed to them. Said once above
+       the row rather than stamped on every card. Inside each row the order is
+       a story: for a buyer, find it -> price it -> compare ways to own it ->
+       check the law -> how deep she digs -> what she hands you. For an agency,
+       what she is -> why speed decides -> what she unblocks -> language ->
+       who pays -> how it goes live. -->
+  <div class="why-group">
+    <h3 class="why-for" id="why-for-a">If you are buying or investing</h3>
+    <div class="why-carousel">
+      <button class="why-nav why-prev" id="why-prev" type="button" aria-label="Previous">&lsaquo;</button>
+      <div class="why-track" id="why-track">
       <div class="why-card">
         <div class="why-num">1</div>
-        <h3 id="card1-title">Investment-analyst depth, not listing descriptions</h3>
-        <p id="card1-body">For every property, plot, or deal, Alla gives you the full cost of entry, a realistic exit value, and the risks that could move either number — not a paraphrased listing description.</p>
+        <h3 id="card1-title">Describe it in words, not tick-boxes</h3>
+        <p id="card1-body">Sea view, twenty minutes from a school, a quiet street, and a return you would accept — say it the way you would say it to a person. She searches real listings and says why each one fits or does not.</p>
       </div>
       <div class="why-card">
         <div class="why-num">2</div>
-        <h3 id="card2-title">Multiple ownership strategies compared side by side</h3>
-        <p id="card2-body">Flip, buy-to-let, or a staged hybrid — Alla models each path for the same property and compares them against each other, instead of handing you one ready-made recommendation to take on faith.</p>
+        <h3 id="card2-title">The numbers, not the sales pitch</h3>
+        <p id="card2-body">Entry cost, a realistic exit value, and the risks that move either one — for any property, plot or deal you bring her.</p>
       </div>
       <div class="why-card">
         <div class="why-num">3</div>
-        <h3 id="card3-title">Legal, tax &amp; zoning intelligence built in</h3>
-        <p id="card3-body">She reads the informe urbanístico, the cadastral data, the registration status — and tells you plainly which risks are real and which numbers still need local verification.</p>
+        <h3 id="card3-title">Three ways to own it, side by side</h3>
+        <p id="card3-body">Flip, rent out, or a staged mix. Each one modelled on the same property, so you choose instead of trusting a single recommendation.</p>
       </div>
       <div class="why-card">
         <div class="why-num">4</div>
-        <h3 id="card4-title">Investment-grade documents on request</h3>
-        <p id="card4-body">A full feasibility memorandum on request, structured the way a professional investment house would build it — sourced from what you've given her, never invented to look complete.</p>
+        <h3 id="card4-title">Legal, tax and zoning, already read</h3>
+        <p id="card4-body">Informe urbanístico, cadastre, registry status. She names the risks that are real and the numbers that still need checking on the ground.</p>
       </div>
       <div class="why-card">
         <div class="why-num">5</div>
-        <h3 id="card5-title">One agent, every side of the deal</h3>
-        <p id="card5-body">The same intelligence works as a buyer's personal advisor, a live agent's copilot, an extra analyst for an agency team, or the assistant on an agency's own website.</p>
+        <h3 id="card5-title">All of Spain, down to your municipality</h3>
+        <p id="card5-body">One town's own rules decide a deal. She goes to that ajuntament's own documents rather than a summary — and says so when she could not reach them.</p>
       </div>
       <div class="why-card">
         <div class="why-num">6</div>
-        <h3 id="card6-title">Shortens the real bottleneck of a transaction</h3>
-        <p id="card6-body">The slow part of a deal usually isn't finding a property — it's getting information to move between buyer, agent, lawyer, and bank. Alla keeps that moving instead of waiting on the next callback.</p>
+        <h3 id="card6-title">An investment memorandum on request</h3>
+        <p id="card6-body">A full feasibility study, built the way an investment house builds one — from your figures, never padded out to look complete.</p>
       </div>
-      <div class="why-card">
-        <div class="why-num">7</div>
-        <h3 id="card7-title">Never off duty</h3>
-        <p id="card7-body">78% of buyers end up working with whoever answers first, and the average agency takes over 15 hours to respond to a new inquiry (NAR / Inman, 2025). Alla replies in seconds, any hour, in the visitor's own language.</p>
       </div>
-      <div class="why-card">
-        <div class="why-num">8</div>
-        <h3 id="card8-title">National reach, down to the municipality</h3>
-        <p id="card8-body">Alla reasons about tax and legal frameworks anywhere in Spain, and she works at the level a deal is actually decided at — the region, the town, the individual municipality and its own zoning, not a whole island or province at a time. Where her ground knowledge is deepest she says so; where a question needs local verification she says that plainly too.</p>
-      </div>
-      <div class="why-card">
-        <div class="why-num">9</div>
-        <h3 id="card9-title">Multilingual by default</h3>
-        <p id="card9-body">Alla replies in whatever language the visitor writes in, automatically — no one has to pick a language first. Ask her to carry on in another language and she switches to it, and she writes documents in whatever language they are needed in.</p>
-      </div>
-      <div class="why-card">
-        <div class="why-num">10</div>
-        <h3 id="card10-title">Free for the visitor, paid for by the agency</h3>
-        <p id="card10-body">On an agency's website, every visitor gets a full, analyst-grade conversation at no cost to them — the subscription is the agency's, so nothing stands between a lead and a real answer.</p>
-      </div>
-      <div class="why-card">
-        <div class="why-num">11</div>
-        <h3 id="card11-title">Deploys in minutes, works like an app anywhere</h3>
-        <p id="card11-body">One script embeds Alla on any agency website. On a phone, she installs like an app and takes voice input — no lengthy setup, no separate download.</p>
-      </div>
+      <button class="why-nav why-next" id="why-next" type="button" aria-label="Next">&rsaquo;</button>
     </div>
-    <button class="why-nav why-next" id="why-next" type="button" aria-label="Next">›</button>
+  </div>
+
+  <div class="why-group">
+    <h3 class="why-for" id="why-for-b">If you run an agency</h3>
+    <div class="why-carousel">
+      <button class="why-nav why-prev" id="why2-prev" type="button" aria-label="Previous">&lsaquo;</button>
+      <div class="why-track" id="why2-track">
+      <div class="why-card">
+        <div class="why-num">1</div>
+        <h3 id="card7-title">One agent, every seat at the table</h3>
+        <p id="card7-body">Advisor to your buyer, copilot to your agent, extra analyst for the team, assistant on your website. The same intelligence in each seat.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-num">2</div>
+        <h3 id="card8-title">Whoever answers first gets the client</h3>
+        <p id="card8-body">78% of buyers go with the first to reply; the average agency takes over 15 hours (NAR / Inman, 2025). Alla answers in seconds, at any hour.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-num">3</div>
+        <h3 id="card9-title">The delay is between people, not listings</h3>
+        <p id="card9-body">Deals stall waiting on the buyer, the agent, the lawyer, the bank. Alla keeps information moving instead of waiting for the next callback.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-num">4</div>
+        <h3 id="card10-title">She speaks your client's language</h3>
+        <p id="card10-body">She replies in whatever language someone writes in, switches on request, and produces documents in whichever language they are needed.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-num">5</div>
+        <h3 id="card11-title">Free for your visitor, paid by you</h3>
+        <p id="card11-body">Every visitor gets an analyst-grade conversation at no cost to them. Nothing stands between a lead and a real answer.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-num">6</div>
+        <h3 id="card12-title">Live on your site in minutes</h3>
+        <p id="card12-body">One script on any agency website. On a phone she installs like an app and takes voice. No integration project, no download.</p>
+      </div>
+      </div>
+      <button class="why-nav why-next" id="why2-next" type="button" aria-label="Next">&rsaquo;</button>
+    </div>
   </div>
 </section>
 
@@ -4246,30 +4284,34 @@
       signInForThreads: 'Sign in to keep your chats and sort them into projects.',
       deleteChatConfirm: 'Delete this conversation? This cannot be undone.',
       folderNamePrompt: 'Project name',
-      whyH2: 'What actually changes for your business',
+      whyH2: 'What actually changes',
+      whyForA: 'If you are buying or investing',
+      whyForB: 'If you run an agency',
+      card1Title: 'Describe it in words, not tick-boxes',
+      card1Body: 'Sea view, twenty minutes from a school, a quiet street, and a return you would accept — say it the way you would say it to a person. She searches real listings and says why each one fits or does not.',
+      card2Title: 'The numbers, not the sales pitch',
+      card2Body: 'Entry cost, a realistic exit value, and the risks that move either one — for any property, plot or deal you bring her.',
+      card3Title: 'Three ways to own it, side by side',
+      card3Body: 'Flip, rent out, or a staged mix. Each one modelled on the same property, so you choose instead of trusting a single recommendation.',
+      card4Title: 'Legal, tax and zoning, already read',
+      card4Body: 'Informe urbanístico, cadastre, registry status. She names the risks that are real and the numbers that still need checking on the ground.',
+      card5Title: 'All of Spain, down to your municipality',
+      card5Body: 'One town\'s own rules decide a deal. She goes to that ajuntament\'s own documents rather than a summary — and says so when she could not reach them.',
+      card6Title: 'An investment memorandum on request',
+      card6Body: 'A full feasibility study, built the way an investment house builds one — from your figures, never padded out to look complete.',
+      card7Title: 'One agent, every seat at the table',
+      card7Body: 'Advisor to your buyer, copilot to your agent, extra analyst for the team, assistant on your website. The same intelligence in each seat.',
+      card8Title: 'Whoever answers first gets the client',
+      card8Body: '78% of buyers go with the first to reply; the average agency takes over 15 hours (NAR / Inman, 2025). Alla answers in seconds, at any hour.',
+      card9Title: 'The delay is between people, not listings',
+      card9Body: 'Deals stall waiting on the buyer, the agent, the lawyer, the bank. Alla keeps information moving instead of waiting for the next callback.',
+      card10Title: 'She speaks your client\'s language',
+      card10Body: 'She replies in whatever language someone writes in, switches on request, and produces documents in whichever language they are needed.',
+      card11Title: 'Free for your visitor, paid by you',
+      card11Body: 'Every visitor gets an analyst-grade conversation at no cost to them. Nothing stands between a lead and a real answer.',
+      card12Title: 'Live on your site in minutes',
+      card12Body: 'One script on any agency website. On a phone she installs like an app and takes voice. No integration project, no download.',
       whyPrevLabel: 'Previous', whyNextLabel: 'Next',
-      card1Title: 'Investment-analyst depth, not listing descriptions',
-      card1Body: "For every property, plot, or deal, Alla gives you the full cost of entry, a realistic exit value, and the risks that could move either number — not a paraphrased listing description.",
-      card2Title: 'Multiple ownership strategies compared side by side',
-      card2Body: "Flip, buy-to-let, or a staged hybrid — Alla models each path for the same property and compares them against each other, instead of handing you one ready-made recommendation to take on faith.",
-      card3Title: 'Legal, tax & zoning intelligence built in',
-      card3Body: "She reads the informe urbanístico, the cadastral data, the registration status — and tells you plainly which risks are real and which numbers still need local verification.",
-      card4Title: 'Investment-grade documents on request',
-      card4Body: "A full feasibility memorandum on request, structured the way a professional investment house would build it — sourced from what you've given her, never invented to look complete.",
-      card5Title: 'One agent, every side of the deal',
-      card5Body: "The same intelligence works as a buyer's personal advisor, a live agent's copilot, an extra analyst for an agency team, or the assistant on an agency's own website.",
-      card6Title: 'Shortens the real bottleneck of a transaction',
-      card6Body: "The slow part of a deal usually isn't finding a property — it's getting information to move between buyer, agent, lawyer, and bank. Alla keeps that moving instead of waiting on the next callback.",
-      card7Title: 'Never off duty',
-      card7Body: "78% of buyers end up working with whoever answers first, and the average agency takes over 15 hours to respond to a new inquiry (NAR / Inman, 2025). Alla replies in seconds, any hour, in the visitor's own language.",
-      card8Title: 'National reach, down to the municipality',
-      card8Body: "Alla reasons about tax and legal frameworks anywhere in Spain, and she works at the level a deal is actually decided at — the region, the town, the individual municipality and its own zoning, not a whole island or province at a time. Where her ground knowledge is deepest she says so; where a question needs local verification she says that plainly too.",
-      card9Title: 'Multilingual by default',
-      card9Body: "Alla replies in whatever language the visitor writes in, automatically — no one has to pick a language first. Ask her to carry on in another language and she switches to it, and she writes documents in whatever language they are needed in.",
-      card10Title: 'Free for the visitor, paid for by the agency',
-      card10Body: "On an agency's website, every visitor gets a full, analyst-grade conversation at no cost to them — the subscription is the agency's, so nothing stands between a lead and a real answer.",
-      card11Title: 'Deploys in minutes, works like an app anywhere',
-      card11Body: "One script embeds Alla on any agency website. On a phone, she installs like an app and takes voice input — no lengthy setup, no separate download."
     },
     es: {
       heroTitle: '<span class="hero-line-main">Tu agente inmobiliario personal con IA.</span><span class="hero-line-accent">Inteligencia global. Experiencia local.</span>',
@@ -4324,30 +4366,34 @@
       signInForThreads: 'Inicia sesión para guardar tus chats y ordenarlos en proyectos.',
       deleteChatConfirm: '¿Eliminar esta conversación? No se puede deshacer.',
       folderNamePrompt: 'Nombre del proyecto',
-      whyH2: 'Lo que realmente cambia para tu negocio',
+      whyH2: 'Qué cambia de verdad',
+      whyForA: 'Si compras o inviertes',
+      whyForB: 'Si diriges una agencia',
+      card1Title: 'Descríbelo con palabras, no con casillas',
+      card1Body: 'Vistas al mar, a veinte minutos de un colegio, calle tranquila y una rentabilidad que te valga — dilo como se lo dirías a una persona. Busca en anuncios reales y explica por qué cada uno encaja o no.',
+      card2Title: 'Los números, no el argumentario',
+      card2Body: 'Coste de entrada, valor de salida realista y los riesgos que mueven ambos — para cualquier inmueble, parcela u operación que le lleves.',
+      card3Title: 'Tres formas de tenerlo, comparadas',
+      card3Body: 'Reformar y vender, alquilar o un mixto por fases. Cada vía calculada sobre el mismo inmueble, para que elijas tú y no una recomendación.',
+      card4Title: 'Lo legal, lo fiscal y el urbanismo, ya leídos',
+      card4Body: 'Informe urbanístico, catastro, situación registral. Señala qué riesgos son reales y qué cifras aún hay que comprobar sobre el terreno.',
+      card5Title: 'Toda España, hasta tu municipio',
+      card5Body: 'Una operación la decide la normativa de un solo municipio. Alla va a los documentos del propio ajuntament, no a un resumen — y lo dice si no ha podido llegar a ellos.',
+      card6Title: 'Un memorándum de inversión cuando lo pidas',
+      card6Body: 'Un estudio de viabilidad completo, construido como lo haría una casa de inversión — con tus cifras, sin relleno para aparentar.',
+      card7Title: 'Un solo agente en todos los asientos',
+      card7Body: 'Asesora de tu comprador, copiloto de tu agente, analista extra del equipo, asistente en tu web. La misma inteligencia en cada papel.',
+      card8Title: 'Quien responde primero se lleva al cliente',
+      card8Body: 'El 78% de los compradores se queda con quien contesta primero; la agencia media tarda más de 15 horas (NAR / Inman, 2025). Alla responde en segundos, a cualquier hora.',
+      card9Title: 'El retraso está entre personas, no en los anuncios',
+      card9Body: 'Las operaciones se atascan esperando al comprador, al agente, al abogado, al banco. Alla mantiene la información en movimiento.',
+      card10Title: 'Habla el idioma de tu cliente',
+      card10Body: 'Responde en el idioma en que le escriben, cambia cuando se lo piden y redacta los documentos en el idioma que haga falta.',
+      card11Title: 'Gratis para tu visitante, lo pagas tú',
+      card11Body: 'Cada visitante recibe una conversación de nivel analista sin coste para él. Nada se interpone entre un lead y una respuesta de verdad.',
+      card12Title: 'En tu web en minutos',
+      card12Body: 'Un script en cualquier web de agencia. En el móvil se instala como una app y acepta voz. Sin proyecto de integración, sin descargas.',
       whyPrevLabel: 'Anterior', whyNextLabel: 'Siguiente',
-      card1Title: 'Profundidad de analista de inversión, no descripciones de anuncio',
-      card1Body: 'Para cada propiedad, parcela u operación, Alla te da el coste de entrada completo, un valor de salida realista y los riesgos que podrían mover cualquiera de las dos cifras — no una descripción de anuncio reformulada.',
-      card2Title: 'Varias estrategias de propiedad comparadas una junto a otra',
-      card2Body: 'Flip, comprar para alquilar, o un híbrido por fases — Alla modela cada camino para la misma propiedad y los compara entre sí, en lugar de darte una única recomendación ya hecha para que la aceptes sin más.',
-      card3Title: 'Inteligencia legal, fiscal y urbanística incorporada',
-      card3Body: 'Lee el informe urbanístico, los datos catastrales, el estado de la inscripción — y te dice con claridad qué riesgos son reales y qué cifras aún necesitan verificación local.',
-      card4Title: 'Documentos de nivel inversor bajo petición',
-      card4Body: 'Un memorando de viabilidad completo bajo petición, estructurado como lo haría una casa de inversión profesional — basado en lo que tú le has dado, nunca inventado para parecer completo.',
-      card5Title: 'Un solo agente, todas las partes del trato',
-      card5Body: 'La misma inteligencia funciona como asesora personal de un comprador, copiloto de un agente en activo, analista adicional para el equipo de una agencia, o asistente en la propia web de una agencia.',
-      card6Title: 'Elimina el verdadero cuello de botella de una operación',
-      card6Body: 'Lo lento de una operación normalmente no es encontrar la propiedad — es hacer que la información se mueva entre comprador, agente, abogado y banco. Alla mantiene ese flujo en marcha en lugar de esperar a la próxima llamada.',
-      card7Title: 'Nunca está fuera de servicio',
-      card7Body: 'El 78% de los compradores acaba trabajando con quien responde primero, y la agencia media tarda más de 15 horas en responder a una nueva consulta (NAR / Inman, 2025). Alla responde en segundos, a cualquier hora, en el idioma del visitante.',
-      card8Title: 'Alcance nacional, hasta el municipio',
-      card8Body: 'Alla razona sobre los marcos fiscales y legales en cualquier punto de España, y trabaja al nivel en el que realmente se decide una operación: la comunidad, la ciudad, el municipio concreto y su propio planeamiento, no una isla o una provincia entera. Dice dónde su conocimiento sobre el terreno es más profundo, y dice con la misma claridad cuándo una pregunta necesita verificación local.',
-      card9Title: 'Multilingüe por defecto',
-      card9Body: 'Alla responde en el idioma en el que escribe el visitante, automáticamente — nadie tiene que elegir un idioma antes. Pídele que siga en otro idioma y cambia a él, y redacta los documentos en el idioma que haga falta.',
-      card10Title: 'Gratis para el visitante, a cargo de la agencia',
-      card10Body: 'En la web de una agencia, cada visitante tiene una conversación completa de nivel analista sin coste para él — la suscripción es de la agencia, así que nada se interpone entre un lead y una respuesta real.',
-      card11Title: 'Se implementa en minutos, funciona como una app en cualquier sitio',
-      card11Body: 'Un solo script incorpora a Alla en cualquier web de agencia. En el móvil, se instala como una app y admite entrada de voz — sin configuración larga, sin descarga aparte.'
     },
     ru: {
       heroTitle: '<span class="hero-line-main">Ваш личный AI-агент по недвижимости.</span><span class="hero-line-accent">Глобальные знания. Местный опыт.</span>',
@@ -4402,30 +4448,34 @@
       signInForThreads: 'Войдите, чтобы разговоры сохранялись и раскладывались по проектам.',
       deleteChatConfirm: 'Удалить этот разговор? Это необратимо.',
       folderNamePrompt: 'Название проекта',
-      whyH2: 'Что реально меняется для вашего бизнеса',
+      whyH2: 'Что меняется на самом деле',
+      whyForA: 'Если вы покупаете или инвестируете',
+      whyForB: 'Если у вас агентство',
+      card1Title: 'Опишите словами, а не галочками в фильтрах',
+      card1Body: 'Вид на море, двадцать минут до школы, тихая улица и доходность, которая вас устроит — скажите так, как сказали бы человеку. Она ищет по реальным объявлениям и объясняет, почему каждое подходит или нет.',
+      card2Title: 'Цифры, а не рекламный текст',
+      card2Body: 'Стоимость входа, реалистичная цена выхода и риски, которые двигают обе — по любому объекту, участку или сделке, которую вы принесёте.',
+      card3Title: 'Три способа владеть — в сравнении',
+      card3Body: 'Перепродажа, аренда или поэтапная смесь. Каждый путь просчитан по одному и тому же объекту, чтобы выбирали вы, а не готовая рекомендация.',
+      card4Title: 'Право, налоги и градрегулирование — уже прочитаны',
+      card4Body: 'Informe urbanístico, кадастр, статус в реестре. Она называет, какие риски настоящие и какие цифры ещё нужно проверить на месте.',
+      card5Title: 'Вся Испания — вплоть до вашего муниципалитета',
+      card5Body: 'Сделку решают правила одного конкретного муниципалитета. Алла идёт в документы самого ajuntament, а не в пересказ — и говорит, если добраться до них не смогла.',
+      card6Title: 'Инвестиционный меморандум по запросу',
+      card6Body: 'Полное обоснование целесообразности, собранное так, как это делает инвестдом — по вашим цифрам, без наполнителя для солидности.',
+      card7Title: 'Один агент на всех местах за столом',
+      card7Body: 'Советник вашему покупателю, копилот вашему агенту, дополнительный аналитик команде, ассистент на вашем сайте. В каждой роли — один и тот же интеллект.',
+      card8Title: 'Клиент достаётся тому, кто ответил первым',
+      card8Body: '78% покупателей остаются с тем, кто ответил первым; среднее агентство отвечает дольше 15 часов (NAR / Inman, 2025). Алла отвечает за секунды, в любой час.',
+      card9Title: 'Задержка между людьми, а не в объявлениях',
+      card9Body: 'Сделки стоят в ожидании покупателя, агента, юриста, банка. Алла двигает информацию, вместо того чтобы ждать следующего звонка.',
+      card10Title: 'Говорит на языке вашего клиента',
+      card10Body: 'Отвечает на том языке, на котором к ней обратились, переключается по просьбе и готовит документы на нужном языке.',
+      card11Title: 'Посетителю бесплатно, платите вы',
+      card11Body: 'Каждый посетитель получает разговор уровня аналитика без оплаты со своей стороны. Между лидом и настоящим ответом не стоит ничего.',
+      card12Title: 'На вашем сайте за минуты',
+      card12Body: 'Один скрипт на любой сайт агентства. На телефоне ставится как приложение и принимает голос. Без проекта внедрения и без загрузок.',
       whyPrevLabel: 'Назад', whyNextLabel: 'Вперёд',
-      card1Title: 'Глубина инвестиционного аналитика, а не описание объявления',
-      card1Body: 'По каждому объекту, участку или сделке Алла даёт полную стоимость входа, реалистичную цену выхода и риски, которые могут сдвинуть любую из этих цифр — а не пересказанное описание из объявления.',
-      card2Title: 'Несколько стратегий владения — в сравнении друг с другом',
-      card2Body: 'Флип, покупка под аренду или поэтапный гибрид — Алла моделирует каждый путь для одного и того же объекта и сравнивает их между собой, вместо того чтобы просто выдать одну готовую рекомендацию на веру.',
-      card3Title: 'Юридическая, налоговая и урбанистическая экспертиза встроена',
-      card3Body: 'Она читает informe urbanístico, кадастровые данные, статус регистрации — и прямо говорит, какие риски реальны, а какие цифры ещё нужно проверить на месте.',
-      card4Title: 'Инвестиционные документы по запросу',
-      card4Body: 'Полноценный меморандум о финансовой целесообразности по запросу, структурированный так, как это сделал бы профессиональный инвестдом — на основе данных, которые вы предоставили, никогда не выдуманных, чтобы выглядеть полными.',
-      card5Title: 'Один агент — на всех сторонах сделки',
-      card5Body: 'Один и тот же интеллект работает как личный советник покупателя, копилот действующего агента, дополнительный аналитик для команды агентства или ассистент на сайте самого агентства.',
-      card6Title: 'Устраняет настоящее узкое место сделки',
-      card6Body: 'Медленная часть сделки обычно не в поиске объекта — а в том, чтобы информация двигалась между покупателем, агентом, юристом и банком. Алла поддерживает это движение, вместо того чтобы ждать следующего звонка.',
-      card7Title: 'Никогда не отдыхает',
-      card7Body: '78% покупателей в итоге работают с тем, кто ответил первым, а среднее агентство отвечает на новый запрос дольше 15 часов (NAR / Inman, 2025). Алла отвечает за секунды, в любое время суток, на языке посетителя.',
-      card8Title: 'Вся страна — и глубина до муниципалитета',
-      card8Body: 'Алла рассуждает о налоговых и юридических рамках в любой точке Испании и работает на том уровне, на котором сделка на самом деле решается: регион, город, конкретный муниципалитет и его собственное градостроительное регулирование, а не остров или провинция целиком. Где её знание местности глубже всего — она говорит; где вопрос требует локальной проверки — говорит так же прямо.',
-      card9Title: 'Многоязычна по умолчанию',
-      card9Body: 'Алла отвечает на том языке, на котором пишет посетитель, автоматически — никому не нужно сначала выбирать язык. Попросите её перейти на удобный вам язык — она перейдёт, и документы составит на том языке, на котором они нужны.',
-      card10Title: 'Бесплатно для посетителя, оплачивает агентство',
-      card10Body: 'На сайте агентства каждый посетитель получает полноценный разговор уровня аналитика бесплатно для себя — подписку оплачивает агентство, так что между лидом и реальным ответом ничего не стоит.',
-      card11Title: 'Разворачивается за минуты, работает как приложение везде',
-      card11Body: 'Один скрипт встраивает Аллу на любой сайт агентства. На телефоне она устанавливается как приложение и принимает голосовой ввод — без долгой настройки, без отдельной загрузки.'
     },
     de: {
       heroTitle: '<span class="hero-line-main">Ihr persönlicher KI-Immobilienmakler.</span><span class="hero-line-accent">Globales Wissen. Lokale Expertise.</span>',
@@ -4480,30 +4530,34 @@
       signInForThreads: 'Melden Sie sich an, um Gespräche zu behalten und in Projekten zu ordnen.',
       deleteChatConfirm: 'Dieses Gespräch löschen? Das lässt sich nicht rückgängig machen.',
       folderNamePrompt: 'Projektname',
-      whyH2: 'Was sich für Ihr Geschäft wirklich ändert',
+      whyH2: 'Was sich wirklich ändert',
+      whyForA: 'Wenn Sie kaufen oder investieren',
+      whyForB: 'Wenn Sie eine Agentur führen',
+      card1Title: 'Beschreiben Sie es in Worten, nicht in Häkchen',
+      card1Body: 'Meerblick, zwanzig Minuten zur Schule, ruhige Straße und eine Rendite, die für Sie passt — sagen Sie es, wie Sie es einem Menschen sagen würden. Sie sucht in echten Inseraten und sagt, warum eines passt oder nicht.',
+      card2Title: 'Zahlen statt Verkaufstext',
+      card2Body: 'Einstiegskosten, realistischer Ausstiegswert und die Risiken, die beides bewegen — für jede Immobilie, jedes Grundstück, jeden Deal.',
+      card3Title: 'Drei Wege zum Eigentum, nebeneinander',
+      card3Body: 'Sanieren und verkaufen, vermieten oder ein Mix in Etappen. Jeder Weg am selben Objekt gerechnet, damit Sie wählen und nicht einer Empfehlung glauben.',
+      card4Title: 'Recht, Steuern und Bauleitplanung, schon gelesen',
+      card4Body: 'Informe urbanístico, Kataster, Grundbuchstand. Sie benennt die echten Risiken und die Zahlen, die vor Ort noch zu prüfen sind.',
+      card5Title: 'Ganz Spanien, bis zu Ihrer Gemeinde',
+      card5Body: 'Über einen Deal entscheiden die Regeln einer einzelnen Gemeinde. Alla geht in die Dokumente des Ajuntament selbst, nicht in eine Zusammenfassung — und sagt es, wenn sie nicht herankam.',
+      card6Title: 'Ein Investmentmemorandum auf Zuruf',
+      card6Body: 'Eine vollständige Machbarkeitsstudie, gebaut wie in einem Investmenthaus — aus Ihren Zahlen, nie aufgefüllt, um vollständig zu wirken.',
+      card7Title: 'Ein Agent auf allen Plätzen',
+      card7Body: 'Beraterin Ihres Käufers, Copilot Ihres Maklers, zusätzliche Analystin im Team, Assistentin auf Ihrer Website. In jeder Rolle dieselbe Intelligenz.',
+      card8Title: 'Wer zuerst antwortet, bekommt den Kunden',
+      card8Body: '78% der Käufer bleiben bei dem, der zuerst antwortet; die durchschnittliche Agentur braucht über 15 Stunden (NAR / Inman, 2025). Alla antwortet in Sekunden, zu jeder Stunde.',
+      card9Title: 'Die Verzögerung liegt zwischen Menschen',
+      card9Body: 'Deals stocken beim Warten auf Käufer, Makler, Anwalt, Bank — nicht bei der Objektsuche. Alla hält die Informationen in Bewegung.',
+      card10Title: 'Sie spricht die Sprache Ihres Kunden',
+      card10Body: 'Sie antwortet in der Sprache, in der man ihr schreibt, wechselt auf Wunsch und verfasst Dokumente in der jeweils benötigten Sprache.',
+      card11Title: 'Für Ihren Besucher kostenlos, bezahlt von Ihnen',
+      card11Body: 'Jeder Besucher bekommt ein Gespräch auf Analystenniveau, ohne Kosten für ihn. Zwischen Lead und echter Antwort steht nichts.',
+      card12Title: 'In Minuten auf Ihrer Website',
+      card12Body: 'Ein Script auf jeder Maklerseite. Auf dem Handy installiert sie sich wie eine App und nimmt Sprache an. Kein Einführungsprojekt, kein Download.',
       whyPrevLabel: 'Zurück', whyNextLabel: 'Weiter',
-      card1Title: 'Tiefe eines Investmentanalysten, keine Anzeigenbeschreibung',
-      card1Body: 'Für jede Immobilie, jedes Grundstück oder jeden Deal liefert Alla die vollen Erwerbskosten, einen realistischen Ausstiegswert und die Risiken, die eine der beiden Zahlen verändern könnten — keine umformulierte Anzeigenbeschreibung.',
-      card2Title: 'Mehrere Eigentumsstrategien im direkten Vergleich',
-      card2Body: 'Flip, Kauf zur Vermietung oder ein gestuftes Hybridmodell — Alla modelliert jeden Weg für dieselbe Immobilie und vergleicht sie miteinander, statt Ihnen eine einzige fertige Empfehlung zum Glauben zu geben.',
-      card3Title: 'Rechts-, Steuer- und Bebauungsplan-Intelligenz eingebaut',
-      card3Body: 'Sie liest den informe urbanístico, die Katasterdaten, den Eintragungsstatus — und sagt Ihnen klar, welche Risiken real sind und welche Zahlen noch eine lokale Prüfung brauchen.',
-      card4Title: 'Investmentreife Dokumente auf Anfrage',
-      card4Body: 'Ein vollständiges Machbarkeitsmemorandum auf Anfrage, aufgebaut wie es ein professionelles Investmenthaus tun würde — gestützt auf das, was Sie ihr gegeben haben, nie erfunden, um vollständig zu wirken.',
-      card5Title: 'Eine Beraterin, jede Seite des Deals',
-      card5Body: 'Dieselbe Intelligenz funktioniert als persönliche Beraterin eines Käufers, als Copilot eines aktiven Maklers, als zusätzliche Analystin für ein Agenturteam oder als Assistentin auf der Website einer Agentur.',
-      card6Title: 'Löst den eigentlichen Engpass einer Transaktion',
-      card6Body: 'Der langsame Teil eines Deals ist meist nicht die Suche nach der Immobilie — sondern dass Informationen zwischen Käufer, Makler, Anwalt und Bank fließen müssen. Alla hält diesen Fluss in Gang, statt auf den nächsten Rückruf zu warten.',
-      card7Title: 'Nie außer Dienst',
-      card7Body: '78 % der Käufer arbeiten am Ende mit demjenigen, der zuerst antwortet, und die durchschnittliche Agentur braucht über 15 Stunden für die erste Reaktion auf eine Anfrage (NAR / Inman, 2025). Alla antwortet in Sekunden, zu jeder Stunde, in der Sprache des Besuchers.',
-      card8Title: 'Landesweite Reichweite, bis zur Gemeinde',
-      card8Body: 'Alla denkt über Steuer- und Rechtsrahmen überall in Spanien nach — und zwar auf der Ebene, auf der ein Geschäft tatsächlich entschieden wird: Region, Stadt, die einzelne Gemeinde und ihre eigene Bauleitplanung, nicht eine ganze Insel oder Provinz. Wo ihr Ortswissen am tiefsten ist, sagt sie es; wo eine Frage eine lokale Prüfung braucht, sagt sie das ebenso klar.',
-      card9Title: 'Standardmäßig mehrsprachig',
-      card9Body: 'Alla antwortet automatisch in der Sprache, in der der Besucher schreibt — niemand muss vorher eine Sprache auswählen. Bitten Sie sie, in einer anderen Sprache fortzufahren, und sie wechselt; Dokumente verfasst sie in der Sprache, in der sie gebraucht werden.',
-      card10Title: 'Kostenlos für den Besucher, bezahlt von der Agentur',
-      card10Body: 'Auf der Website einer Agentur erhält jeder Besucher ein vollständiges Gespräch auf Analystenniveau ohne eigene Kosten — das Abonnement gehört der Agentur, sodass nichts zwischen einem Lead und einer echten Antwort steht.',
-      card11Title: 'In Minuten eingerichtet, funktioniert überall wie eine App',
-      card11Body: 'Ein einziges Skript bindet Alla auf jeder Agentur-Website ein. Auf dem Handy installiert sie sich wie eine App und nimmt Spracheingabe entgegen — ohne lange Einrichtung, ohne separaten Download.'
     },
     fr: {
       heroTitle: '<span class="hero-line-main">Votre agent immobilier personnel par IA.</span><span class="hero-line-accent">Intelligence globale. Expertise locale.</span>',
@@ -4558,30 +4612,34 @@
       signInForThreads: 'Connectez-vous pour conserver vos conversations et les classer par projet.',
       deleteChatConfirm: 'Supprimer cette conversation ? C\'est irréversible.',
       folderNamePrompt: 'Nom du projet',
-      whyH2: 'Ce qui change réellement pour votre activité',
+      whyH2: 'Ce qui change vraiment',
+      whyForA: 'Si vous achetez ou investissez',
+      whyForB: 'Si vous dirigez une agence',
+      card1Title: 'Décrivez-le avec des mots, pas des cases à cocher',
+      card1Body: 'Vue sur mer, à vingt minutes d\'une école, rue calme et un rendement qui vous convient — dites-le comme vous le diriez à quelqu\'un. Elle cherche dans de vraies annonces et explique pourquoi chacune convient ou non.',
+      card2Title: 'Des chiffres, pas un argumentaire',
+      card2Body: 'Coût d\'entrée, valeur de sortie réaliste et les risques qui déplacent les deux — pour n\'importe quel bien, terrain ou opération.',
+      card3Title: 'Trois façons de le détenir, côte à côte',
+      card3Body: 'Revendre, louer ou un montage par étapes. Chaque voie chiffrée sur le même bien, pour que vous choisissiez au lieu de croire une recommandation.',
+      card4Title: 'Juridique, fiscal et urbanisme, déjà lus',
+      card4Body: 'Informe urbanístico, cadastre, situation au registre. Elle nomme les risques réels et les chiffres qui restent à vérifier sur place.',
+      card5Title: 'Toute l\'Espagne, jusqu\'à votre commune',
+      card5Body: 'Une opération se décide sur les règles d\'une seule commune. Alla va aux documents de l\'ajuntament lui-même, pas à un résumé — et le dit si elle n\'a pas pu les atteindre.',
+      card6Title: 'Un mémorandum d\'investissement sur demande',
+      card6Body: 'Une étude de faisabilité complète, construite comme le ferait une maison d\'investissement — à partir de vos chiffres, jamais gonflée pour faire sérieux.',
+      card7Title: 'Un seul agent, à toutes les places',
+      card7Body: 'Conseillère de votre acheteur, copilote de votre agent, analyste supplémentaire de l\'équipe, assistante sur votre site. La même intelligence partout.',
+      card8Title: 'Le premier à répondre emporte le client',
+      card8Body: '78% des acheteurs restent avec celui qui répond en premier ; l\'agence moyenne met plus de 15 heures (NAR / Inman, 2025). Alla répond en secondes, à toute heure.',
+      card9Title: 'Le retard est entre les personnes',
+      card9Body: 'Les opérations calent en attendant l\'acheteur, l\'agent, l\'avocat, la banque — pas en cherchant un bien. Alla fait circuler l\'information.',
+      card10Title: 'Elle parle la langue de votre client',
+      card10Body: 'Elle répond dans la langue qu\'on lui écrit, change à la demande et rédige les documents dans la langue voulue.',
+      card11Title: 'Gratuit pour votre visiteur, payé par vous',
+      card11Body: 'Chaque visiteur obtient une conversation de niveau analyste sans frais pour lui. Rien ne s\'interpose entre un prospect et une vraie réponse.',
+      card12Title: 'En ligne sur votre site en quelques minutes',
+      card12Body: 'Un script sur n\'importe quel site d\'agence. Sur mobile elle s\'installe comme une app et accepte la voix. Aucun projet d\'intégration, aucun téléchargement.',
       whyPrevLabel: 'Précédent', whyNextLabel: 'Suivant',
-      card1Title: "Profondeur d'analyste en investissement, pas une description d'annonce",
-      card1Body: "Pour chaque bien, terrain ou opération, Alla vous donne le coût d'entrée complet, une valeur de sortie réaliste et les risques qui pourraient faire bouger l'un ou l'autre chiffre — pas une description d'annonce reformulée.",
-      card2Title: 'Plusieurs stratégies de propriété comparées côte à côte',
-      card2Body: "Flip, achat pour louer, ou hybride par étapes — Alla modélise chaque voie pour le même bien et les compare entre elles, au lieu de vous donner une seule recommandation toute faite à prendre pour argent comptant.",
-      card3Title: 'Intelligence juridique, fiscale et urbanistique intégrée',
-      card3Body: "Elle lit l'informe urbanístico, les données cadastrales, le statut d'inscription — et vous dit clairement quels risques sont réels et quels chiffres nécessitent encore une vérification locale.",
-      card4Title: 'Documents de niveau investisseur sur demande',
-      card4Body: "Un mémorandum de faisabilité complet sur demande, structuré comme le ferait une maison d'investissement professionnelle — fondé sur ce que vous lui avez fourni, jamais inventé pour paraître complet.",
-      card5Title: 'Une seule conseillère, tous les côtés de la transaction',
-      card5Body: "La même intelligence fonctionne comme conseillère personnelle d'un acheteur, copilote d'un agent en activité, analyste supplémentaire pour l'équipe d'une agence, ou assistante sur le site web d'une agence.",
-      card6Title: "Élimine le vrai goulot d'étranglement d'une transaction",
-      card6Body: "La partie lente d'une transaction, ce n'est généralement pas de trouver le bien — c'est de faire circuler l'information entre l'acheteur, l'agent, l'avocat et la banque. Alla maintient cette circulation au lieu d'attendre le prochain rappel.",
-      card7Title: 'Jamais hors service',
-      card7Body: "78 % des acheteurs finissent par travailler avec celui qui répond en premier, et l'agence moyenne met plus de 15 heures à répondre à une nouvelle demande (NAR / Inman, 2025). Alla répond en quelques secondes, à toute heure, dans la langue du visiteur.",
-      card8Title: "Portée nationale, jusqu’à la commune",
-      card8Body: "Alla raisonne sur les cadres fiscaux et juridiques partout en Espagne, au niveau où une opération se décide vraiment : la région, la ville, la commune précise et son propre urbanisme, et non une île ou une province entière. Elle dit où sa connaissance du terrain est la plus fine, et tout aussi clairement quand une question exige une vérification locale.",
-      card9Title: 'Multilingue par défaut',
-      card9Body: "Alla répond automatiquement dans la langue utilisée par le visiteur — personne n'a besoin de choisir une langue au préalable. Demandez-lui de continuer dans une autre langue et elle y passe ; elle rédige les documents dans la langue voulue.",
-      card10Title: "Gratuit pour le visiteur, à la charge de l'agence",
-      card10Body: "Sur le site d'une agence, chaque visiteur bénéficie d'une conversation complète de niveau analyste sans frais pour lui — l'abonnement appartient à l'agence, donc rien ne se met entre un lead et une vraie réponse.",
-      card11Title: "Déployée en quelques minutes, fonctionne comme une application partout",
-      card11Body: "Un seul script intègre Alla sur n'importe quel site d'agence. Sur un téléphone, elle s'installe comme une application et accepte la saisie vocale — sans configuration longue, sans téléchargement séparé."
     },
     pt: {
       heroTitle: '<span class="hero-line-main">O seu agente imobiliário pessoal com IA.</span><span class="hero-line-accent">Inteligência global. Experiência local.</span>',
@@ -4636,30 +4694,34 @@
       signInForThreads: 'Inicie sessão para guardar as conversas e organizá-las em projetos.',
       deleteChatConfirm: 'Eliminar esta conversa? Não é reversível.',
       folderNamePrompt: 'Nome do projeto',
-      whyH2: 'O que realmente muda para o seu negócio',
+      whyH2: 'O que muda de facto',
+      whyForA: 'Se está a comprar ou a investir',
+      whyForB: 'Se gere uma agência',
+      card1Title: 'Descreva-o por palavras, não por caixas',
+      card1Body: 'Vista de mar, a vinte minutos de uma escola, rua sossegada e uma rentabilidade que lhe sirva — diga-o como diria a uma pessoa. Procura em anúncios reais e explica porque cada um encaixa ou não.',
+      card2Title: 'Números, não um argumento de venda',
+      card2Body: 'Custo de entrada, valor de saída realista e os riscos que movem ambos — para qualquer imóvel, terreno ou negócio.',
+      card3Title: 'Três formas de o deter, lado a lado',
+      card3Body: 'Revender, arrendar ou um misto faseado. Cada via calculada sobre o mesmo imóvel, para escolher você e não acreditar numa recomendação.',
+      card4Title: 'Jurídico, fiscal e urbanismo, já lidos',
+      card4Body: 'Informe urbanístico, cadastro, situação registral. Aponta que riscos são reais e que números faltam confirmar no terreno.',
+      card5Title: 'Toda a Espanha, até ao seu município',
+      card5Body: 'Um negócio decide-se pelas regras de um único município. A Alla vai aos documentos do próprio ajuntament, não a um resumo — e di-lo se não conseguiu chegar lá.',
+      card6Title: 'Um memorando de investimento a pedido',
+      card6Body: 'Um estudo de viabilidade completo, construído como o faria uma casa de investimento — com os seus números, nunca inflado para parecer completo.',
+      card7Title: 'Um agente em todos os lugares à mesa',
+      card7Body: 'Consultora do seu comprador, copiloto do seu agente, analista extra da equipa, assistente no seu site. A mesma inteligência em cada papel.',
+      card8Title: 'Quem responde primeiro fica com o cliente',
+      card8Body: '78% dos compradores ficam com quem responde primeiro; a agência média demora mais de 15 horas (NAR / Inman, 2025). A Alla responde em segundos, a qualquer hora.',
+      card9Title: 'O atraso está entre pessoas, não nos anúncios',
+      card9Body: 'Os negócios param à espera do comprador, do agente, do advogado, do banco. A Alla mantém a informação em movimento.',
+      card10Title: 'Fala a língua do seu cliente',
+      card10Body: 'Responde no idioma em que lhe escrevem, muda a pedido e redige os documentos no idioma necessário.',
+      card11Title: 'Grátis para o seu visitante, pago por si',
+      card11Body: 'Cada visitante recebe uma conversa ao nível de analista sem custo para ele. Nada se interpõe entre um lead e uma resposta a sério.',
+      card12Title: 'No seu site em minutos',
+      card12Body: 'Um script em qualquer site de agência. No telemóvel instala-se como uma app e aceita voz. Sem projeto de integração, sem descargas.',
       whyPrevLabel: 'Anterior', whyNextLabel: 'Seguinte',
-      card1Title: 'Profundidade de analista de investimento, não descrições de anúncio',
-      card1Body: 'Para cada imóvel, terreno ou negócio, a Alla dá-lhe o custo total de entrada, um valor de saída realista e os riscos que poderiam alterar qualquer um dos números — não uma descrição de anúncio reformulada.',
-      card2Title: 'Várias estratégias de propriedade comparadas lado a lado',
-      card2Body: 'Flip, compra para arrendar, ou um híbrido faseado — a Alla modela cada caminho para o mesmo imóvel e compara-os entre si, em vez de lhe dar uma única recomendação já pronta para aceitar sem mais.',
-      card3Title: 'Inteligência jurídica, fiscal e urbanística incorporada',
-      card3Body: 'Lê o informe urbanístico, os dados cadastrais, o estado do registo — e diz-lhe claramente quais os riscos reais e quais os números que ainda precisam de verificação local.',
-      card4Title: 'Documentos de nível de investidor a pedido',
-      card4Body: 'Um memorando de viabilidade completo a pedido, estruturado como uma casa de investimento profissional o faria — baseado no que lhe forneceu, nunca inventado para parecer completo.',
-      card5Title: 'Um único agente, todos os lados do negócio',
-      card5Body: 'A mesma inteligência funciona como consultora pessoal de um comprador, copiloto de um agente em atividade, analista extra para uma equipa de agência, ou assistente no próprio site de uma agência.',
-      card6Title: 'Elimina o verdadeiro estrangulamento de uma transação',
-      card6Body: 'A parte lenta de um negócio normalmente não é encontrar o imóvel — é fazer a informação circular entre comprador, agente, advogado e banco. A Alla mantém isso a fluir em vez de esperar pela próxima chamada.',
-      card7Title: 'Nunca está fora de serviço',
-      card7Body: '78% dos compradores acabam por trabalhar com quem responde primeiro, e a agência média demora mais de 15 horas a responder a uma nova consulta (NAR / Inman, 2025). A Alla responde em segundos, a qualquer hora, no idioma do visitante.',
-      card8Title: 'Alcance nacional, até ao município',
-      card8Body: 'A Alla raciocina sobre os quadros fiscais e legais em qualquer parte de Espanha, ao nível em que um negócio é realmente decidido: a região, a cidade, o município concreto e o seu próprio ordenamento, e não uma ilha ou província inteira. Diz onde o seu conhecimento do terreno é mais profundo e, com a mesma clareza, quando uma questão precisa de verificação local.',
-      card9Title: 'Multilingue por padrão',
-      card9Body: 'A Alla responde automaticamente no idioma em que o visitante escreve — ninguém precisa de escolher um idioma primeiro. Peça-lhe para continuar noutro idioma e ela muda, e redige os documentos no idioma em que forem necessários.',
-      card10Title: 'Gratuito para o visitante, pago pela agência',
-      card10Body: 'No site de uma agência, cada visitante tem uma conversa completa de nível analista sem custo para si — a subscrição é da agência, por isso nada se interpõe entre um lead e uma resposta real.',
-      card11Title: 'Implementado em minutos, funciona como uma app em qualquer lugar',
-      card11Body: 'Um único script incorpora a Alla em qualquer site de agência. No telemóvel, instala-se como uma app e aceita entrada de voz — sem configuração longa, sem download separado.'
     },
     it: {
       heroTitle: '<span class="hero-line-main">Il tuo agente immobiliare personale con IA.</span><span class="hero-line-accent">Intelligenza globale. Competenza locale.</span>',
@@ -4714,30 +4776,34 @@
       signInForThreads: 'Accedi per conservare le conversazioni e ordinarle in progetti.',
       deleteChatConfirm: 'Eliminare questa conversazione? Non è reversibile.',
       folderNamePrompt: 'Nome del progetto',
-      whyH2: 'Cosa cambia davvero per la tua attività',
+      whyH2: 'Che cosa cambia davvero',
+      whyForA: 'Se stai comprando o investendo',
+      whyForB: 'Se hai un\'agenzia',
+      card1Title: 'Descrivilo a parole, non con le caselle',
+      card1Body: 'Vista mare, venti minuti da una scuola, strada tranquilla e un rendimento che ti va bene — dillo come lo diresti a una persona. Cerca fra annunci veri e spiega perché ciascuno va bene o no.',
+      card2Title: 'Numeri, non un discorso di vendita',
+      card2Body: 'Costo d\'ingresso, valore di uscita realistico e i rischi che spostano entrambi — per qualsiasi immobile, terreno o operazione.',
+      card3Title: 'Tre modi di possederlo, a confronto',
+      card3Body: 'Rivendere, affittare o un mix a tappe. Ogni via calcolata sullo stesso immobile, così scegli tu invece di fidarti di una raccomandazione.',
+      card4Title: 'Legale, fiscale e urbanistica, già letti',
+      card4Body: 'Informe urbanístico, catasto, situazione al registro. Indica quali rischi sono reali e quali numeri vanno ancora verificati sul posto.',
+      card5Title: 'Tutta la Spagna, fino al tuo comune',
+      card5Body: 'Un\'operazione la decidono le regole di un singolo comune. Alla va ai documenti dell\'ajuntament stesso, non a un riassunto — e lo dice se non è riuscita ad arrivarci.',
+      card6Title: 'Un memorandum d\'investimento su richiesta',
+      card6Body: 'Uno studio di fattibilità completo, costruito come lo farebbe una casa d\'investimento — sui tuoi numeri, mai gonfiato per sembrare completo.',
+      card7Title: 'Un solo agente, in ogni ruolo',
+      card7Body: 'Consulente del tuo acquirente, copilota del tuo agente, analista in più per il team, assistente sul tuo sito. La stessa intelligenza ovunque.',
+      card8Title: 'Chi risponde per primo si prende il cliente',
+      card8Body: 'Il 78% degli acquirenti resta con chi risponde per primo; l\'agenzia media impiega oltre 15 ore (NAR / Inman, 2025). Alla risponde in secondi, a qualsiasi ora.',
+      card9Title: 'Il ritardo è tra le persone, non negli annunci',
+      card9Body: 'Le trattative si fermano aspettando l\'acquirente, l\'agente, l\'avvocato, la banca. Alla tiene in movimento le informazioni.',
+      card10Title: 'Parla la lingua del tuo cliente',
+      card10Body: 'Risponde nella lingua in cui le scrivono, cambia su richiesta e redige i documenti nella lingua che serve.',
+      card11Title: 'Gratis per il tuo visitatore, lo paghi tu',
+      card11Body: 'Ogni visitatore ha una conversazione da analista senza costi per lui. Tra un lead e una risposta vera non c\'è nulla.',
+      card12Title: 'Online sul tuo sito in pochi minuti',
+      card12Body: 'Uno script su qualsiasi sito d\'agenzia. Sul telefono si installa come un\'app e accetta la voce. Nessun progetto d\'integrazione, nessun download.',
       whyPrevLabel: 'Precedente', whyNextLabel: 'Successivo',
-      card1Title: 'Profondità da analista di investimento, non descrizioni da annuncio',
-      card1Body: "Per ogni immobile, terreno o affare, Alla ti dà il costo di ingresso completo, un valore di uscita realistico e i rischi che potrebbero far cambiare l'una o l'altra cifra — non una descrizione da annuncio riformulata.",
-      card2Title: 'Più strategie di proprietà messe a confronto',
-      card2Body: "Flip, acquisto per affittare, o un ibrido a fasi — Alla modella ciascun percorso per lo stesso immobile e li confronta tra loro, invece di darti un'unica raccomandazione già pronta da accettare sulla fiducia.",
-      card3Title: 'Intelligenza legale, fiscale e urbanistica integrata',
-      card3Body: "Legge l'informe urbanístico, i dati catastali, lo stato di registrazione — e ti dice chiaramente quali rischi sono reali e quali cifre necessitano ancora di verifica locale.",
-      card4Title: 'Documenti di livello investitore su richiesta',
-      card4Body: "Un memorandum di fattibilità completo su richiesta, strutturato come lo farebbe una casa di investimento professionale — basato su ciò che le hai fornito, mai inventato per sembrare completo.",
-      card5Title: "Un'unica consulente, ogni lato dell'affare",
-      card5Body: "La stessa intelligenza funziona come consulente personale di un acquirente, copilota di un agente attivo, analista aggiuntiva per il team di un'agenzia, o assistente sul sito web di un'agenzia.",
-      card6Title: "Elimina il vero collo di bottiglia di una transazione",
-      card6Body: "La parte lenta di un affare di solito non è trovare l'immobile — è far circolare le informazioni tra acquirente, agente, avvocato e banca. Alla mantiene questo flusso invece di aspettare la prossima chiamata.",
-      card7Title: 'Mai fuori servizio',
-      card7Body: "Il 78% degli acquirenti finisce per lavorare con chi risponde per primo, e l'agenzia media impiega oltre 15 ore per rispondere a una nuova richiesta (NAR / Inman, 2025). Alla risponde in pochi secondi, a qualsiasi ora, nella lingua del visitatore.",
-      card8Title: 'Copertura nazionale, fino al comune',
-      card8Body: "Alla ragiona sui quadri fiscali e legali in qualsiasi parte della Spagna, al livello in cui un affare si decide davvero: la regione, la città, il singolo comune e la sua urbanistica, non un'intera isola o provincia. Dice dove la sua conoscenza del territorio è più profonda e, con la stessa chiarezza, quando una domanda richiede una verifica locale.",
-      card9Title: 'Multilingue per impostazione predefinita',
-      card9Body: "Alla risponde automaticamente nella lingua in cui scrive il visitatore — nessuno deve scegliere prima una lingua. Chiedile di proseguire in un'altra lingua e ci passa, e redige i documenti nella lingua in cui servono.",
-      card10Title: "Gratis per il visitatore, a carico dell'agenzia",
-      card10Body: "Sul sito di un'agenzia, ogni visitatore ha una conversazione completa di livello analista senza costi per lui — l'abbonamento è dell'agenzia, quindi nulla si frappone tra un lead e una risposta reale.",
-      card11Title: "Si implementa in pochi minuti, funziona come un'app ovunque",
-      card11Body: "Un unico script integra Alla su qualsiasi sito di agenzia. Sul telefono si installa come un'app e accetta input vocale — senza configurazioni lunghe, senza download separati."
     }
   };
 
@@ -4763,7 +4829,9 @@
   setHtml("hero-title", T.heroTitle);
   setText("hero-tagline", T.heroTagline);
   setText("why-h2", T.whyH2);
-  for (var wc = 1; wc <= 11; wc++) {
+  setText("why-for-a", T.whyForA);
+  setText("why-for-b", T.whyForB);
+  for (var wc = 1; wc <= 12; wc++) {
     setText("card" + wc + "-title", T["card" + wc + "Title"]);
     setText("card" + wc + "-body", T["card" + wc + "Body"]);
   }
@@ -4876,6 +4944,15 @@
 
   setupCarousel({
     trackId: "why-track", prevId: "why-prev", nextId: "why-next",
+    cardSelector: ".why-card", cloneClass: "why-card-clone",
+    spacerClass: "why-spacer", gapFallback: 16,
+    prevLabel: T.whyPrevLabel, nextLabel: T.whyNextLabel,
+  });
+
+  // The agency row is the same carousel, second instance. The mechanics were
+  // already generalised for the skills strip, so this is configuration.
+  setupCarousel({
+    trackId: "why2-track", prevId: "why2-prev", nextId: "why2-next",
     cardSelector: ".why-card", cloneClass: "why-card-clone",
     spacerClass: "why-spacer", gapFallback: 16,
     prevLabel: T.whyPrevLabel, nextLabel: T.whyNextLabel,
