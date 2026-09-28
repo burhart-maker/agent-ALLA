@@ -439,9 +439,9 @@
     border-color: transparent;
     background: var(--accent);
     color: #fff;
-    /* A ring the colour of the page, because the hero behind this corner is
-       itself pink — without it the button sinks into the artwork. */
-    box-shadow: 0 0 0 2px var(--paper), 0 3px 12px rgba(15,18,22,0.20);
+    /* Flat: no ring and no shadow. The circle carries itself on colour and
+       shape alone, which is the whole of the mark. */
+    box-shadow: none;
   }
   #corner-account:hover { background: var(--accent-strong); }
   #corner-account svg { display: block; }
@@ -450,6 +450,199 @@
     .corner-btn { top: 10px; }
     #side-toggle { left: 10px; }
     #corner-account { right: 10px; }
+  }
+
+  /* The way in (v70).
+     A sheet over the page rather than a separate page, because signing in is
+     an interruption of what someone came to do, not a destination: they should
+     land back in the same conversation, at the same scroll position, the
+     moment it is over. Everything here uses the page's own tokens, so it
+     follows the device's light/dark setting like the rest. */
+
+  .sheet-veil {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(12, 16, 20, 0.44);
+    backdrop-filter: blur(2px);
+  }
+  .sheet-veil.open { display: flex; }
+
+  .sheet {
+    width: min(420px, 100%);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 26px 24px 22px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--paper-raised);
+    color: var(--ink);
+    box-shadow: 0 18px 60px rgba(12, 16, 20, 0.28);
+  }
+  .sheet h2 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-size: 21px;
+    margin: 0 0 6px;
+  }
+  .sheet .sheet-intro {
+    margin: 0 0 18px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+  .sheet-close {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .sheet-close:hover { background: var(--accent-soft); }
+  .sheet-body { position: relative; }
+
+  /* Google's own mark and wording, because a button people recognise is
+     clicked and a button they have to read is not. */
+  .sheet-provider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    height: 46px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .sheet-provider:hover { background: var(--accent-soft); }
+  .sheet-provider svg { flex: none; }
+
+  .sheet-or {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0;
+    color: var(--ink-soft);
+    font-size: 12px;
+    text-transform: lowercase;
+  }
+  .sheet-or::before, .sheet-or::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .sheet-field { display: block; margin: 0 0 12px; }
+  .sheet-field > span {
+    display: block;
+    margin: 0 0 5px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .sheet-field .hint {
+    display: block;
+    margin: 5px 0 0;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--ink-soft);
+  }
+  .sheet-field input {
+    width: 100%;
+    box-sizing: border-box;
+    height: 44px;
+    padding: 0 13px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+    font-size: 15px;   /* never below 16px-equivalent zoom trigger on iOS at this size */
+  }
+  .sheet-field input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  #si-code {
+    font-size: 26px;
+    letter-spacing: 0.34em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sheet-go {
+    width: 100%;
+    height: 46px;
+    margin-top: 4px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .sheet-go:hover { background: var(--accent-strong); }
+  .sheet-go[disabled] { opacity: 0.55; cursor: default; }
+
+  .sheet-link {
+    display: inline-block;
+    margin-top: 12px;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--accent);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .sheet-link[disabled] { color: var(--ink-soft); cursor: default; text-decoration: none; }
+
+  .sheet-msg {
+    margin: 12px 0 0;
+    font-size: 13px;
+    line-height: 1.45;
+    min-height: 1px;
+  }
+  .sheet-msg.bad { color: var(--accent-strong); }
+
+  .sheet-legal {
+    margin: 16px 0 0;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+  .sheet-legal a { color: inherit; }
+
+  @media (max-width: 480px) {
+    .sheet-veil { padding: 0; align-items: flex-end; }
+    .sheet {
+      width: 100%;
+      max-height: 92vh;
+      border-radius: 18px 18px 0 0;
+      border-bottom: 0;
+    }
   }
 
   .side-head {
@@ -1111,11 +1304,90 @@
   </svg>
 </button>
 <a class="corner-btn" id="corner-account" href="account.html" aria-label="Account">
-  <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <circle cx="12" cy="8.1" r="3.7"/>
-    <path d="M12 13.3c-4.1 0-7.4 2.6-7.4 5.9 0 .45.36.8.8.8h13.2c.44 0 .8-.35.8-.8 0-3.3-3.3-5.9-7.4-5.9z"/>
+  <!-- The figure fills the circle rather than sitting in the middle of it:
+       at 19px it read as a small person in a large button, which is not what
+       a mark should look like. Drawn slightly larger than the viewBox centre
+       so the shoulders run to the edge and are cropped by the circle, the way
+       a portrait is. -->
+  <svg width="30" height="30" viewBox="2.6 3.2 18.8 18.8" fill="currentColor" aria-hidden="true">
+    <circle cx="12" cy="9.1" r="3.9"/>
+    <path d="M12 14.4c-4.3 0-7.8 2.7-7.8 6.2 0 .5.4.9.9.9h13.8c.5 0 .9-.4.9-.9 0-3.5-3.5-6.2-7.8-6.2z"/>
   </svg>
 </a>
+
+<!-- The way in (v70). One sheet, three steps: choose a door, prove the
+     address, leave a number. Registration and signing in are the same road —
+     there is no separate "create an account", because from the person's side
+     there is no separate thing to create. -->
+<div class="sheet-veil" id="signin-veil" role="dialog" aria-modal="true" aria-labelledby="si-title">
+  <div class="sheet">
+    <div class="sheet-body">
+      <button class="sheet-close" type="button" id="si-close" aria-label="Close">&times;</button>
+      <h2 id="si-title">Sign in</h2>
+      <p class="sheet-intro" id="si-intro"></p>
+
+      <!-- step 1: the doors -->
+      <div id="si-step-start">
+        <a class="sheet-provider" id="si-google" href="/api/auth/google/start" hidden>
+          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+            <path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.2-.4-4.7H24v8.9h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.2-3.8 6.6-9.5 6.6-16.3z"/>
+            <path fill="#34A853" d="M24 46c6 0 11-2 14.6-5.2l-7.1-5.5c-2 1.3-4.5 2.1-7.5 2.1-5.8 0-10.7-3.9-12.4-9.1H4.3v5.7C7.9 41.1 15.4 46 24 46z"/>
+            <path fill="#FBBC05" d="M11.6 28.3c-.5-1.3-.7-2.8-.7-4.3s.3-3 .7-4.3v-5.7H4.3C2.8 17 2 20.4 2 24s.8 7 2.3 10l7.3-5.7z"/>
+            <path fill="#EA4335" d="M24 10.6c3.3 0 6.2 1.1 8.5 3.3l6.3-6.3C35 4.1 30 2 24 2 15.4 2 7.9 6.9 4.3 14l7.3 5.7c1.7-5.2 6.6-9.1 12.4-9.1z"/>
+          </svg>
+          <span id="si-google-text">Continue with Google</span>
+        </a>
+        <div class="sheet-or" id="si-or" hidden><span id="si-or-text">or</span></div>
+
+        <form id="si-email-form" autocomplete="on">
+          <label class="sheet-field">
+            <span id="si-name-label">Your name</span>
+            <input type="text" id="si-name" name="name" autocomplete="name" maxlength="60">
+          </label>
+          <label class="sheet-field">
+            <span id="si-email-label">Email</span>
+            <input type="email" id="si-email" name="email" required autocomplete="email" inputmode="email">
+          </label>
+          <label class="sheet-field" id="si-phone-field">
+            <span id="si-phone-label">Telephone</span>
+            <input type="tel" id="si-phone" name="phone" autocomplete="tel" inputmode="tel" maxlength="24">
+            <span class="hint" id="si-phone-hint"></span>
+          </label>
+          <button class="sheet-go" type="submit" id="si-send">Send me a code</button>
+        </form>
+      </div>
+
+      <!-- step 2: the code -->
+      <div id="si-step-code" hidden>
+        <form id="si-code-form">
+          <label class="sheet-field">
+            <span id="si-code-label">The code from the email</span>
+            <input type="text" id="si-code" name="code" required inputmode="numeric" autocomplete="one-time-code"
+                   maxlength="6" pattern="[0-9]*">
+            <span class="hint" id="si-code-hint"></span>
+          </label>
+          <button class="sheet-go" type="submit" id="si-verify">Continue</button>
+        </form>
+        <button class="sheet-link" type="button" id="si-resend"></button>
+      </div>
+
+      <!-- step 3: the number, for whoever came in through a provider -->
+      <div id="si-step-phone" hidden>
+        <form id="si-phone-form">
+          <label class="sheet-field">
+            <span id="si-phone2-label">Telephone</span>
+            <input type="tel" id="si-phone2" name="phone" required autocomplete="tel" inputmode="tel" maxlength="24">
+            <span class="hint" id="si-phone2-hint"></span>
+          </label>
+          <button class="sheet-go" type="submit" id="si-phone-save">Save</button>
+        </form>
+      </div>
+
+      <p class="sheet-msg" id="si-msg"></p>
+      <p class="sheet-legal" id="si-legal"></p>
+    </div>
+  </div>
+</div>
 
 <section class="hero">
   <div class="hero-bg">
@@ -2664,53 +2936,48 @@
       </div>
       <div class="why-card">
         <div class="why-num">3</div>
-        <h3 id="card3-title">Independent of any single agency's inventory</h3>
-        <p id="card3-body">As a personal advisor, Alla isn't paid to steer you toward a specific listing — she evaluates any property, plot, or portfolio you bring her on its own numbers, whether or not it's on an agency's books.</p>
+        <h3 id="card3-title">Legal, tax &amp; zoning intelligence built in</h3>
+        <p id="card3-body">She reads the informe urbanístico, the cadastral data, the registration status — and tells you plainly which risks are real and which numbers still need local verification.</p>
       </div>
       <div class="why-card">
         <div class="why-num">4</div>
-        <h3 id="card4-title">Legal, tax &amp; zoning intelligence built in</h3>
-        <p id="card4-body">She reads the informe urbanístico, the cadastral data, the registration status — and tells you plainly which risks are real and which numbers still need local verification.</p>
+        <h3 id="card4-title">Investment-grade documents on request</h3>
+        <p id="card4-body">A full feasibility memorandum on request, structured the way a professional investment house would build it — sourced from what you've given her, never invented to look complete.</p>
       </div>
       <div class="why-card">
         <div class="why-num">5</div>
-        <h3 id="card5-title">Investment-grade documents on request</h3>
-        <p id="card5-body">A full feasibility memorandum on request, structured the way a professional investment house would build it — sourced from what you've given her, never invented to look complete.</p>
+        <h3 id="card5-title">One agent, every side of the deal</h3>
+        <p id="card5-body">The same intelligence works as a buyer's personal advisor, a live agent's copilot, an extra analyst for an agency team, or the assistant on an agency's own website.</p>
       </div>
       <div class="why-card">
         <div class="why-num">6</div>
-        <h3 id="card6-title">One agent, every side of the deal</h3>
-        <p id="card6-body">The same intelligence works as a buyer's personal advisor, a live agent's copilot, an extra analyst for an agency team, or the assistant on an agency's own website.</p>
+        <h3 id="card6-title">Shortens the real bottleneck of a transaction</h3>
+        <p id="card6-body">The slow part of a deal usually isn't finding a property — it's getting information to move between buyer, agent, lawyer, and bank. Alla keeps that moving instead of waiting on the next callback.</p>
       </div>
       <div class="why-card">
         <div class="why-num">7</div>
-        <h3 id="card7-title">Shortens the real bottleneck of a transaction</h3>
-        <p id="card7-body">The slow part of a deal usually isn't finding a property — it's getting information to move between buyer, agent, lawyer, and bank. Alla keeps that moving instead of waiting on the next callback.</p>
+        <h3 id="card7-title">Never off duty</h3>
+        <p id="card7-body">78% of buyers end up working with whoever answers first, and the average agency takes over 15 hours to respond to a new inquiry (NAR / Inman, 2025). Alla replies in seconds, any hour, in the visitor's own language.</p>
       </div>
       <div class="why-card">
         <div class="why-num">8</div>
-        <h3 id="card8-title">Never off duty</h3>
-        <p id="card8-body">78% of buyers end up working with whoever answers first, and the average agency takes over 15 hours to respond to a new inquiry (NAR / Inman, 2025). Alla replies in seconds, any hour, in the visitor's own language.</p>
+        <h3 id="card8-title">National reach, down to the municipality</h3>
+        <p id="card8-body">Alla reasons about tax and legal frameworks anywhere in Spain, and she works at the level a deal is actually decided at — the region, the town, the individual municipality and its own zoning, not a whole island or province at a time. Where her ground knowledge is deepest she says so; where a question needs local verification she says that plainly too.</p>
       </div>
       <div class="why-card">
         <div class="why-num">9</div>
-        <h3 id="card9-title">National reach, island-level depth</h3>
-        <p id="card9-body">Alla reasons about tax and legal frameworks anywhere in Spain. Her deepest expertise — municipal zoning, tourist licensing, the non-resident buyer market — is the Balearic Islands, and she says plainly when a question needs local verification beyond that.</p>
+        <h3 id="card9-title">Multilingual by default</h3>
+        <p id="card9-body">Alla replies in whatever language the visitor writes in, automatically — no one has to pick a language first. Ask her to carry on in another language and she switches to it, and she writes documents in whatever language they are needed in.</p>
       </div>
       <div class="why-card">
         <div class="why-num">10</div>
-        <h3 id="card10-title">Multilingual by default</h3>
-        <p id="card10-body">Alla replies in whatever language the visitor writes in, automatically — no one has to pick a language first.</p>
+        <h3 id="card10-title">Free for the visitor, paid for by the agency</h3>
+        <p id="card10-body">On an agency's website, every visitor gets a full, analyst-grade conversation at no cost to them — the subscription is the agency's, so nothing stands between a lead and a real answer.</p>
       </div>
       <div class="why-card">
         <div class="why-num">11</div>
-        <h3 id="card11-title">Free for the visitor, paid for by the agency</h3>
-        <p id="card11-body">On an agency's website, every visitor gets a full, analyst-grade conversation at no cost to them — the subscription is the agency's, so nothing stands between a lead and a real answer.</p>
-      </div>
-      <div class="why-card">
-        <div class="why-num">12</div>
-        <h3 id="card12-title">Deploys in minutes, works like an app anywhere</h3>
-        <p id="card12-body">One script embeds Alla on any agency website. On a phone, she installs like an app and takes voice input — no lengthy setup, no separate download.</p>
+        <h3 id="card11-title">Deploys in minutes, works like an app anywhere</h3>
+        <p id="card11-body">One script embeds Alla on any agency website. On a phone, she installs like an app and takes voice input — no lengthy setup, no separate download.</p>
       </div>
     </div>
     <button class="why-nav why-next" id="why-next" type="button" aria-label="Next">›</button>
@@ -3985,26 +4252,24 @@
       card1Body: "For every property, plot, or deal, Alla gives you the full cost of entry, a realistic exit value, and the risks that could move either number — not a paraphrased listing description.",
       card2Title: 'Multiple ownership strategies compared side by side',
       card2Body: "Flip, buy-to-let, or a staged hybrid — Alla models each path for the same property and compares them against each other, instead of handing you one ready-made recommendation to take on faith.",
-      card3Title: "Independent of any single agency's inventory",
-      card3Body: "As a personal advisor, Alla isn't paid to steer you toward a specific listing — she evaluates any property, plot, or portfolio you bring her on its own numbers, whether or not it's on an agency's books.",
-      card4Title: 'Legal, tax & zoning intelligence built in',
-      card4Body: "She reads the informe urbanístico, the cadastral data, the registration status — and tells you plainly which risks are real and which numbers still need local verification.",
-      card5Title: 'Investment-grade documents on request',
-      card5Body: "A full feasibility memorandum on request, structured the way a professional investment house would build it — sourced from what you've given her, never invented to look complete.",
-      card6Title: 'One agent, every side of the deal',
-      card6Body: "The same intelligence works as a buyer's personal advisor, a live agent's copilot, an extra analyst for an agency team, or the assistant on an agency's own website.",
-      card7Title: 'Shortens the real bottleneck of a transaction',
-      card7Body: "The slow part of a deal usually isn't finding a property — it's getting information to move between buyer, agent, lawyer, and bank. Alla keeps that moving instead of waiting on the next callback.",
-      card8Title: 'Never off duty',
-      card8Body: "78% of buyers end up working with whoever answers first, and the average agency takes over 15 hours to respond to a new inquiry (NAR / Inman, 2025). Alla replies in seconds, any hour, in the visitor's own language.",
-      card9Title: 'National reach, island-level depth',
-      card9Body: "Alla reasons about tax and legal frameworks anywhere in Spain. Her deepest expertise — municipal zoning, tourist licensing, the non-resident buyer market — is the Balearic Islands, and she says plainly when a question needs local verification beyond that.",
-      card10Title: 'Multilingual by default',
-      card10Body: "Alla replies in whatever language the visitor writes in, automatically — no one has to pick a language first.",
-      card11Title: 'Free for the visitor, paid for by the agency',
-      card11Body: "On an agency's website, every visitor gets a full, analyst-grade conversation at no cost to them — the subscription is the agency's, so nothing stands between a lead and a real answer.",
-      card12Title: 'Deploys in minutes, works like an app anywhere',
-      card12Body: "One script embeds Alla on any agency website. On a phone, she installs like an app and takes voice input — no lengthy setup, no separate download."
+      card3Title: 'Legal, tax & zoning intelligence built in',
+      card3Body: "She reads the informe urbanístico, the cadastral data, the registration status — and tells you plainly which risks are real and which numbers still need local verification.",
+      card4Title: 'Investment-grade documents on request',
+      card4Body: "A full feasibility memorandum on request, structured the way a professional investment house would build it — sourced from what you've given her, never invented to look complete.",
+      card5Title: 'One agent, every side of the deal',
+      card5Body: "The same intelligence works as a buyer's personal advisor, a live agent's copilot, an extra analyst for an agency team, or the assistant on an agency's own website.",
+      card6Title: 'Shortens the real bottleneck of a transaction',
+      card6Body: "The slow part of a deal usually isn't finding a property — it's getting information to move between buyer, agent, lawyer, and bank. Alla keeps that moving instead of waiting on the next callback.",
+      card7Title: 'Never off duty',
+      card7Body: "78% of buyers end up working with whoever answers first, and the average agency takes over 15 hours to respond to a new inquiry (NAR / Inman, 2025). Alla replies in seconds, any hour, in the visitor's own language.",
+      card8Title: 'National reach, down to the municipality',
+      card8Body: "Alla reasons about tax and legal frameworks anywhere in Spain, and she works at the level a deal is actually decided at — the region, the town, the individual municipality and its own zoning, not a whole island or province at a time. Where her ground knowledge is deepest she says so; where a question needs local verification she says that plainly too.",
+      card9Title: 'Multilingual by default',
+      card9Body: "Alla replies in whatever language the visitor writes in, automatically — no one has to pick a language first. Ask her to carry on in another language and she switches to it, and she writes documents in whatever language they are needed in.",
+      card10Title: 'Free for the visitor, paid for by the agency',
+      card10Body: "On an agency's website, every visitor gets a full, analyst-grade conversation at no cost to them — the subscription is the agency's, so nothing stands between a lead and a real answer.",
+      card11Title: 'Deploys in minutes, works like an app anywhere',
+      card11Body: "One script embeds Alla on any agency website. On a phone, she installs like an app and takes voice input — no lengthy setup, no separate download."
     },
     es: {
       heroTitle: '<span class="hero-line-main">Tu agente inmobiliario personal con IA.</span><span class="hero-line-accent">Inteligencia global. Experiencia local.</span>',
@@ -4065,26 +4330,24 @@
       card1Body: 'Para cada propiedad, parcela u operación, Alla te da el coste de entrada completo, un valor de salida realista y los riesgos que podrían mover cualquiera de las dos cifras — no una descripción de anuncio reformulada.',
       card2Title: 'Varias estrategias de propiedad comparadas una junto a otra',
       card2Body: 'Flip, comprar para alquilar, o un híbrido por fases — Alla modela cada camino para la misma propiedad y los compara entre sí, en lugar de darte una única recomendación ya hecha para que la aceptes sin más.',
-      card3Title: 'Independiente del inventario de una sola agencia',
-      card3Body: 'Como asesora personal, a Alla no le pagan por dirigirte hacia un anuncio concreto — evalúa cualquier propiedad, parcela o cartera que le lleves según sus propios números, esté o no en la cartera de una agencia.',
-      card4Title: 'Inteligencia legal, fiscal y urbanística incorporada',
-      card4Body: 'Lee el informe urbanístico, los datos catastrales, el estado de la inscripción — y te dice con claridad qué riesgos son reales y qué cifras aún necesitan verificación local.',
-      card5Title: 'Documentos de nivel inversor bajo petición',
-      card5Body: 'Un memorando de viabilidad completo bajo petición, estructurado como lo haría una casa de inversión profesional — basado en lo que tú le has dado, nunca inventado para parecer completo.',
-      card6Title: 'Un solo agente, todas las partes del trato',
-      card6Body: 'La misma inteligencia funciona como asesora personal de un comprador, copiloto de un agente en activo, analista adicional para el equipo de una agencia, o asistente en la propia web de una agencia.',
-      card7Title: 'Elimina el verdadero cuello de botella de una operación',
-      card7Body: 'Lo lento de una operación normalmente no es encontrar la propiedad — es hacer que la información se mueva entre comprador, agente, abogado y banco. Alla mantiene ese flujo en marcha en lugar de esperar a la próxima llamada.',
-      card8Title: 'Nunca está fuera de servicio',
-      card8Body: 'El 78% de los compradores acaba trabajando con quien responde primero, y la agencia media tarda más de 15 horas en responder a una nueva consulta (NAR / Inman, 2025). Alla responde en segundos, a cualquier hora, en el idioma del visitante.',
-      card9Title: 'Alcance nacional, profundidad a nivel de isla',
-      card9Body: 'Alla razona sobre los marcos fiscales y legales en cualquier punto de España. Su experiencia más profunda — urbanismo municipal, licencias turísticas, el mercado de compradores no residentes — está en las Islas Baleares, y dice con claridad cuándo una pregunta necesita verificación local más allá de eso.',
-      card10Title: 'Multilingüe por defecto',
-      card10Body: 'Alla responde en el idioma en el que escribe el visitante, automáticamente — nadie tiene que elegir un idioma antes.',
-      card11Title: 'Gratis para el visitante, a cargo de la agencia',
-      card11Body: 'En la web de una agencia, cada visitante tiene una conversación completa de nivel analista sin coste para él — la suscripción es de la agencia, así que nada se interpone entre un lead y una respuesta real.',
-      card12Title: 'Se implementa en minutos, funciona como una app en cualquier sitio',
-      card12Body: 'Un solo script incorpora a Alla en cualquier web de agencia. En el móvil, se instala como una app y admite entrada de voz — sin configuración larga, sin descarga aparte.'
+      card3Title: 'Inteligencia legal, fiscal y urbanística incorporada',
+      card3Body: 'Lee el informe urbanístico, los datos catastrales, el estado de la inscripción — y te dice con claridad qué riesgos son reales y qué cifras aún necesitan verificación local.',
+      card4Title: 'Documentos de nivel inversor bajo petición',
+      card4Body: 'Un memorando de viabilidad completo bajo petición, estructurado como lo haría una casa de inversión profesional — basado en lo que tú le has dado, nunca inventado para parecer completo.',
+      card5Title: 'Un solo agente, todas las partes del trato',
+      card5Body: 'La misma inteligencia funciona como asesora personal de un comprador, copiloto de un agente en activo, analista adicional para el equipo de una agencia, o asistente en la propia web de una agencia.',
+      card6Title: 'Elimina el verdadero cuello de botella de una operación',
+      card6Body: 'Lo lento de una operación normalmente no es encontrar la propiedad — es hacer que la información se mueva entre comprador, agente, abogado y banco. Alla mantiene ese flujo en marcha en lugar de esperar a la próxima llamada.',
+      card7Title: 'Nunca está fuera de servicio',
+      card7Body: 'El 78% de los compradores acaba trabajando con quien responde primero, y la agencia media tarda más de 15 horas en responder a una nueva consulta (NAR / Inman, 2025). Alla responde en segundos, a cualquier hora, en el idioma del visitante.',
+      card8Title: 'Alcance nacional, hasta el municipio',
+      card8Body: 'Alla razona sobre los marcos fiscales y legales en cualquier punto de España, y trabaja al nivel en el que realmente se decide una operación: la comunidad, la ciudad, el municipio concreto y su propio planeamiento, no una isla o una provincia entera. Dice dónde su conocimiento sobre el terreno es más profundo, y dice con la misma claridad cuándo una pregunta necesita verificación local.',
+      card9Title: 'Multilingüe por defecto',
+      card9Body: 'Alla responde en el idioma en el que escribe el visitante, automáticamente — nadie tiene que elegir un idioma antes. Pídele que siga en otro idioma y cambia a él, y redacta los documentos en el idioma que haga falta.',
+      card10Title: 'Gratis para el visitante, a cargo de la agencia',
+      card10Body: 'En la web de una agencia, cada visitante tiene una conversación completa de nivel analista sin coste para él — la suscripción es de la agencia, así que nada se interpone entre un lead y una respuesta real.',
+      card11Title: 'Se implementa en minutos, funciona como una app en cualquier sitio',
+      card11Body: 'Un solo script incorpora a Alla en cualquier web de agencia. En el móvil, se instala como una app y admite entrada de voz — sin configuración larga, sin descarga aparte.'
     },
     ru: {
       heroTitle: '<span class="hero-line-main">Ваш личный AI-агент по недвижимости.</span><span class="hero-line-accent">Глобальные знания. Местный опыт.</span>',
@@ -4145,26 +4408,24 @@
       card1Body: 'По каждому объекту, участку или сделке Алла даёт полную стоимость входа, реалистичную цену выхода и риски, которые могут сдвинуть любую из этих цифр — а не пересказанное описание из объявления.',
       card2Title: 'Несколько стратегий владения — в сравнении друг с другом',
       card2Body: 'Флип, покупка под аренду или поэтапный гибрид — Алла моделирует каждый путь для одного и того же объекта и сравнивает их между собой, вместо того чтобы просто выдать одну готовую рекомендацию на веру.',
-      card3Title: 'Независима от портфеля какого-либо одного агентства',
-      card3Body: 'Как личный советник, Алла не получает вознаграждение за то, что направит вас к конкретному объявлению — она оценивает любой объект, участок или портфель, который вы ей принесёте, по его собственным цифрам, независимо от того, есть ли он в базе какого-то агентства.',
-      card4Title: 'Юридическая, налоговая и урбанистическая экспертиза встроена',
-      card4Body: 'Она читает informe urbanístico, кадастровые данные, статус регистрации — и прямо говорит, какие риски реальны, а какие цифры ещё нужно проверить на месте.',
-      card5Title: 'Инвестиционные документы по запросу',
-      card5Body: 'Полноценный меморандум о финансовой целесообразности по запросу, структурированный так, как это сделал бы профессиональный инвестдом — на основе данных, которые вы предоставили, никогда не выдуманных, чтобы выглядеть полными.',
-      card6Title: 'Один агент — на всех сторонах сделки',
-      card6Body: 'Один и тот же интеллект работает как личный советник покупателя, копилот действующего агента, дополнительный аналитик для команды агентства или ассистент на сайте самого агентства.',
-      card7Title: 'Устраняет настоящее узкое место сделки',
-      card7Body: 'Медленная часть сделки обычно не в поиске объекта — а в том, чтобы информация двигалась между покупателем, агентом, юристом и банком. Алла поддерживает это движение, вместо того чтобы ждать следующего звонка.',
-      card8Title: 'Никогда не отдыхает',
-      card8Body: '78% покупателей в итоге работают с тем, кто ответил первым, а среднее агентство отвечает на новый запрос дольше 15 часов (NAR / Inman, 2025). Алла отвечает за секунды, в любое время суток, на языке посетителя.',
-      card9Title: 'Вся страна — и глубина на уровне острова',
-      card9Body: 'Алла рассуждает о налоговых и юридических рамках в любой точке Испании. Её самая глубокая экспертиза — муниципальное зонирование, туристическое лицензирование, рынок нерезидентов-покупателей — Балеарские острова, и она прямо говорит, когда вопрос требует локальной проверки сверх этого.',
-      card10Title: 'Многоязычна по умолчанию',
-      card10Body: 'Алла отвечает на том языке, на котором пишет посетитель, автоматически — никому не нужно сначала выбирать язык.',
-      card11Title: 'Бесплатно для посетителя, оплачивает агентство',
-      card11Body: 'На сайте агентства каждый посетитель получает полноценный разговор уровня аналитика бесплатно для себя — подписку оплачивает агентство, так что между лидом и реальным ответом ничего не стоит.',
-      card12Title: 'Разворачивается за минуты, работает как приложение везде',
-      card12Body: 'Один скрипт встраивает Аллу на любой сайт агентства. На телефоне она устанавливается как приложение и принимает голосовой ввод — без долгой настройки, без отдельной загрузки.'
+      card3Title: 'Юридическая, налоговая и урбанистическая экспертиза встроена',
+      card3Body: 'Она читает informe urbanístico, кадастровые данные, статус регистрации — и прямо говорит, какие риски реальны, а какие цифры ещё нужно проверить на месте.',
+      card4Title: 'Инвестиционные документы по запросу',
+      card4Body: 'Полноценный меморандум о финансовой целесообразности по запросу, структурированный так, как это сделал бы профессиональный инвестдом — на основе данных, которые вы предоставили, никогда не выдуманных, чтобы выглядеть полными.',
+      card5Title: 'Один агент — на всех сторонах сделки',
+      card5Body: 'Один и тот же интеллект работает как личный советник покупателя, копилот действующего агента, дополнительный аналитик для команды агентства или ассистент на сайте самого агентства.',
+      card6Title: 'Устраняет настоящее узкое место сделки',
+      card6Body: 'Медленная часть сделки обычно не в поиске объекта — а в том, чтобы информация двигалась между покупателем, агентом, юристом и банком. Алла поддерживает это движение, вместо того чтобы ждать следующего звонка.',
+      card7Title: 'Никогда не отдыхает',
+      card7Body: '78% покупателей в итоге работают с тем, кто ответил первым, а среднее агентство отвечает на новый запрос дольше 15 часов (NAR / Inman, 2025). Алла отвечает за секунды, в любое время суток, на языке посетителя.',
+      card8Title: 'Вся страна — и глубина до муниципалитета',
+      card8Body: 'Алла рассуждает о налоговых и юридических рамках в любой точке Испании и работает на том уровне, на котором сделка на самом деле решается: регион, город, конкретный муниципалитет и его собственное градостроительное регулирование, а не остров или провинция целиком. Где её знание местности глубже всего — она говорит; где вопрос требует локальной проверки — говорит так же прямо.',
+      card9Title: 'Многоязычна по умолчанию',
+      card9Body: 'Алла отвечает на том языке, на котором пишет посетитель, автоматически — никому не нужно сначала выбирать язык. Попросите её перейти на удобный вам язык — она перейдёт, и документы составит на том языке, на котором они нужны.',
+      card10Title: 'Бесплатно для посетителя, оплачивает агентство',
+      card10Body: 'На сайте агентства каждый посетитель получает полноценный разговор уровня аналитика бесплатно для себя — подписку оплачивает агентство, так что между лидом и реальным ответом ничего не стоит.',
+      card11Title: 'Разворачивается за минуты, работает как приложение везде',
+      card11Body: 'Один скрипт встраивает Аллу на любой сайт агентства. На телефоне она устанавливается как приложение и принимает голосовой ввод — без долгой настройки, без отдельной загрузки.'
     },
     de: {
       heroTitle: '<span class="hero-line-main">Ihr persönlicher KI-Immobilienmakler.</span><span class="hero-line-accent">Globales Wissen. Lokale Expertise.</span>',
@@ -4225,26 +4486,24 @@
       card1Body: 'Für jede Immobilie, jedes Grundstück oder jeden Deal liefert Alla die vollen Erwerbskosten, einen realistischen Ausstiegswert und die Risiken, die eine der beiden Zahlen verändern könnten — keine umformulierte Anzeigenbeschreibung.',
       card2Title: 'Mehrere Eigentumsstrategien im direkten Vergleich',
       card2Body: 'Flip, Kauf zur Vermietung oder ein gestuftes Hybridmodell — Alla modelliert jeden Weg für dieselbe Immobilie und vergleicht sie miteinander, statt Ihnen eine einzige fertige Empfehlung zum Glauben zu geben.',
-      card3Title: 'Unabhängig vom Bestand einer einzelnen Agentur',
-      card3Body: 'Als persönliche Beraterin wird Alla nicht dafür bezahlt, Sie zu einem bestimmten Angebot zu lenken — sie bewertet jede Immobilie, jedes Grundstück oder Portfolio, das Sie ihr vorlegen, anhand der eigenen Zahlen, egal ob es im Bestand einer Agentur ist oder nicht.',
-      card4Title: 'Rechts-, Steuer- und Bebauungsplan-Intelligenz eingebaut',
-      card4Body: 'Sie liest den informe urbanístico, die Katasterdaten, den Eintragungsstatus — und sagt Ihnen klar, welche Risiken real sind und welche Zahlen noch eine lokale Prüfung brauchen.',
-      card5Title: 'Investmentreife Dokumente auf Anfrage',
-      card5Body: 'Ein vollständiges Machbarkeitsmemorandum auf Anfrage, aufgebaut wie es ein professionelles Investmenthaus tun würde — gestützt auf das, was Sie ihr gegeben haben, nie erfunden, um vollständig zu wirken.',
-      card6Title: 'Eine Beraterin, jede Seite des Deals',
-      card6Body: 'Dieselbe Intelligenz funktioniert als persönliche Beraterin eines Käufers, als Copilot eines aktiven Maklers, als zusätzliche Analystin für ein Agenturteam oder als Assistentin auf der Website einer Agentur.',
-      card7Title: 'Löst den eigentlichen Engpass einer Transaktion',
-      card7Body: 'Der langsame Teil eines Deals ist meist nicht die Suche nach der Immobilie — sondern dass Informationen zwischen Käufer, Makler, Anwalt und Bank fließen müssen. Alla hält diesen Fluss in Gang, statt auf den nächsten Rückruf zu warten.',
-      card8Title: 'Nie außer Dienst',
-      card8Body: '78 % der Käufer arbeiten am Ende mit demjenigen, der zuerst antwortet, und die durchschnittliche Agentur braucht über 15 Stunden für die erste Reaktion auf eine Anfrage (NAR / Inman, 2025). Alla antwortet in Sekunden, zu jeder Stunde, in der Sprache des Besuchers.',
-      card9Title: 'Landesweite Reichweite, Tiefe auf Inselebene',
-      card9Body: 'Alla denkt über Steuer- und Rechtsrahmen überall in Spanien nach. Ihre tiefste Expertise — kommunale Bebauungsplanung, Tourismuslizenzen, der Markt für gebietsfremde Käufer — liegt auf den Balearen, und sie sagt klar, wenn eine Frage eine lokale Prüfung darüber hinaus braucht.',
-      card10Title: 'Standardmäßig mehrsprachig',
-      card10Body: 'Alla antwortet automatisch in der Sprache, in der der Besucher schreibt — niemand muss vorher eine Sprache auswählen.',
-      card11Title: 'Kostenlos für den Besucher, bezahlt von der Agentur',
-      card11Body: 'Auf der Website einer Agentur erhält jeder Besucher ein vollständiges Gespräch auf Analystenniveau ohne eigene Kosten — das Abonnement gehört der Agentur, sodass nichts zwischen einem Lead und einer echten Antwort steht.',
-      card12Title: 'In Minuten eingerichtet, funktioniert überall wie eine App',
-      card12Body: 'Ein einziges Skript bindet Alla auf jeder Agentur-Website ein. Auf dem Handy installiert sie sich wie eine App und nimmt Spracheingabe entgegen — ohne lange Einrichtung, ohne separaten Download.'
+      card3Title: 'Rechts-, Steuer- und Bebauungsplan-Intelligenz eingebaut',
+      card3Body: 'Sie liest den informe urbanístico, die Katasterdaten, den Eintragungsstatus — und sagt Ihnen klar, welche Risiken real sind und welche Zahlen noch eine lokale Prüfung brauchen.',
+      card4Title: 'Investmentreife Dokumente auf Anfrage',
+      card4Body: 'Ein vollständiges Machbarkeitsmemorandum auf Anfrage, aufgebaut wie es ein professionelles Investmenthaus tun würde — gestützt auf das, was Sie ihr gegeben haben, nie erfunden, um vollständig zu wirken.',
+      card5Title: 'Eine Beraterin, jede Seite des Deals',
+      card5Body: 'Dieselbe Intelligenz funktioniert als persönliche Beraterin eines Käufers, als Copilot eines aktiven Maklers, als zusätzliche Analystin für ein Agenturteam oder als Assistentin auf der Website einer Agentur.',
+      card6Title: 'Löst den eigentlichen Engpass einer Transaktion',
+      card6Body: 'Der langsame Teil eines Deals ist meist nicht die Suche nach der Immobilie — sondern dass Informationen zwischen Käufer, Makler, Anwalt und Bank fließen müssen. Alla hält diesen Fluss in Gang, statt auf den nächsten Rückruf zu warten.',
+      card7Title: 'Nie außer Dienst',
+      card7Body: '78 % der Käufer arbeiten am Ende mit demjenigen, der zuerst antwortet, und die durchschnittliche Agentur braucht über 15 Stunden für die erste Reaktion auf eine Anfrage (NAR / Inman, 2025). Alla antwortet in Sekunden, zu jeder Stunde, in der Sprache des Besuchers.',
+      card8Title: 'Landesweite Reichweite, bis zur Gemeinde',
+      card8Body: 'Alla denkt über Steuer- und Rechtsrahmen überall in Spanien nach — und zwar auf der Ebene, auf der ein Geschäft tatsächlich entschieden wird: Region, Stadt, die einzelne Gemeinde und ihre eigene Bauleitplanung, nicht eine ganze Insel oder Provinz. Wo ihr Ortswissen am tiefsten ist, sagt sie es; wo eine Frage eine lokale Prüfung braucht, sagt sie das ebenso klar.',
+      card9Title: 'Standardmäßig mehrsprachig',
+      card9Body: 'Alla antwortet automatisch in der Sprache, in der der Besucher schreibt — niemand muss vorher eine Sprache auswählen. Bitten Sie sie, in einer anderen Sprache fortzufahren, und sie wechselt; Dokumente verfasst sie in der Sprache, in der sie gebraucht werden.',
+      card10Title: 'Kostenlos für den Besucher, bezahlt von der Agentur',
+      card10Body: 'Auf der Website einer Agentur erhält jeder Besucher ein vollständiges Gespräch auf Analystenniveau ohne eigene Kosten — das Abonnement gehört der Agentur, sodass nichts zwischen einem Lead und einer echten Antwort steht.',
+      card11Title: 'In Minuten eingerichtet, funktioniert überall wie eine App',
+      card11Body: 'Ein einziges Skript bindet Alla auf jeder Agentur-Website ein. Auf dem Handy installiert sie sich wie eine App und nimmt Spracheingabe entgegen — ohne lange Einrichtung, ohne separaten Download.'
     },
     fr: {
       heroTitle: '<span class="hero-line-main">Votre agent immobilier personnel par IA.</span><span class="hero-line-accent">Intelligence globale. Expertise locale.</span>',
@@ -4305,26 +4564,24 @@
       card1Body: "Pour chaque bien, terrain ou opération, Alla vous donne le coût d'entrée complet, une valeur de sortie réaliste et les risques qui pourraient faire bouger l'un ou l'autre chiffre — pas une description d'annonce reformulée.",
       card2Title: 'Plusieurs stratégies de propriété comparées côte à côte',
       card2Body: "Flip, achat pour louer, ou hybride par étapes — Alla modélise chaque voie pour le même bien et les compare entre elles, au lieu de vous donner une seule recommandation toute faite à prendre pour argent comptant.",
-      card3Title: "Indépendante de l'inventaire d'une seule agence",
-      card3Body: "En tant que conseillère personnelle, Alla n'est pas payée pour vous orienter vers une annonce en particulier — elle évalue tout bien, terrain ou portefeuille que vous lui soumettez selon ses propres chiffres, qu'il figure ou non au catalogue d'une agence.",
-      card4Title: 'Intelligence juridique, fiscale et urbanistique intégrée',
-      card4Body: "Elle lit l'informe urbanístico, les données cadastrales, le statut d'inscription — et vous dit clairement quels risques sont réels et quels chiffres nécessitent encore une vérification locale.",
-      card5Title: 'Documents de niveau investisseur sur demande',
-      card5Body: "Un mémorandum de faisabilité complet sur demande, structuré comme le ferait une maison d'investissement professionnelle — fondé sur ce que vous lui avez fourni, jamais inventé pour paraître complet.",
-      card6Title: 'Une seule conseillère, tous les côtés de la transaction',
-      card6Body: "La même intelligence fonctionne comme conseillère personnelle d'un acheteur, copilote d'un agent en activité, analyste supplémentaire pour l'équipe d'une agence, ou assistante sur le site web d'une agence.",
-      card7Title: "Élimine le vrai goulot d'étranglement d'une transaction",
-      card7Body: "La partie lente d'une transaction, ce n'est généralement pas de trouver le bien — c'est de faire circuler l'information entre l'acheteur, l'agent, l'avocat et la banque. Alla maintient cette circulation au lieu d'attendre le prochain rappel.",
-      card8Title: 'Jamais hors service',
-      card8Body: "78 % des acheteurs finissent par travailler avec celui qui répond en premier, et l'agence moyenne met plus de 15 heures à répondre à une nouvelle demande (NAR / Inman, 2025). Alla répond en quelques secondes, à toute heure, dans la langue du visiteur.",
-      card9Title: "Portée nationale, profondeur à l'échelle de l'île",
-      card9Body: "Alla raisonne sur les cadres fiscaux et juridiques partout en Espagne. Son expertise la plus poussée — urbanisme municipal, licences touristiques, marché des acheteurs non-résidents — se trouve aux Baléares, et elle indique clairement quand une question nécessite une vérification locale au-delà de cela.",
-      card10Title: 'Multilingue par défaut',
-      card10Body: "Alla répond automatiquement dans la langue utilisée par le visiteur — personne n'a besoin de choisir une langue au préalable.",
-      card11Title: "Gratuit pour le visiteur, à la charge de l'agence",
-      card11Body: "Sur le site d'une agence, chaque visiteur bénéficie d'une conversation complète de niveau analyste sans frais pour lui — l'abonnement appartient à l'agence, donc rien ne se met entre un lead et une vraie réponse.",
-      card12Title: "Déployée en quelques minutes, fonctionne comme une application partout",
-      card12Body: "Un seul script intègre Alla sur n'importe quel site d'agence. Sur un téléphone, elle s'installe comme une application et accepte la saisie vocale — sans configuration longue, sans téléchargement séparé."
+      card3Title: 'Intelligence juridique, fiscale et urbanistique intégrée',
+      card3Body: "Elle lit l'informe urbanístico, les données cadastrales, le statut d'inscription — et vous dit clairement quels risques sont réels et quels chiffres nécessitent encore une vérification locale.",
+      card4Title: 'Documents de niveau investisseur sur demande',
+      card4Body: "Un mémorandum de faisabilité complet sur demande, structuré comme le ferait une maison d'investissement professionnelle — fondé sur ce que vous lui avez fourni, jamais inventé pour paraître complet.",
+      card5Title: 'Une seule conseillère, tous les côtés de la transaction',
+      card5Body: "La même intelligence fonctionne comme conseillère personnelle d'un acheteur, copilote d'un agent en activité, analyste supplémentaire pour l'équipe d'une agence, ou assistante sur le site web d'une agence.",
+      card6Title: "Élimine le vrai goulot d'étranglement d'une transaction",
+      card6Body: "La partie lente d'une transaction, ce n'est généralement pas de trouver le bien — c'est de faire circuler l'information entre l'acheteur, l'agent, l'avocat et la banque. Alla maintient cette circulation au lieu d'attendre le prochain rappel.",
+      card7Title: 'Jamais hors service',
+      card7Body: "78 % des acheteurs finissent par travailler avec celui qui répond en premier, et l'agence moyenne met plus de 15 heures à répondre à une nouvelle demande (NAR / Inman, 2025). Alla répond en quelques secondes, à toute heure, dans la langue du visiteur.",
+      card8Title: "Portée nationale, jusqu’à la commune",
+      card8Body: "Alla raisonne sur les cadres fiscaux et juridiques partout en Espagne, au niveau où une opération se décide vraiment : la région, la ville, la commune précise et son propre urbanisme, et non une île ou une province entière. Elle dit où sa connaissance du terrain est la plus fine, et tout aussi clairement quand une question exige une vérification locale.",
+      card9Title: 'Multilingue par défaut',
+      card9Body: "Alla répond automatiquement dans la langue utilisée par le visiteur — personne n'a besoin de choisir une langue au préalable. Demandez-lui de continuer dans une autre langue et elle y passe ; elle rédige les documents dans la langue voulue.",
+      card10Title: "Gratuit pour le visiteur, à la charge de l'agence",
+      card10Body: "Sur le site d'une agence, chaque visiteur bénéficie d'une conversation complète de niveau analyste sans frais pour lui — l'abonnement appartient à l'agence, donc rien ne se met entre un lead et une vraie réponse.",
+      card11Title: "Déployée en quelques minutes, fonctionne comme une application partout",
+      card11Body: "Un seul script intègre Alla sur n'importe quel site d'agence. Sur un téléphone, elle s'installe comme une application et accepte la saisie vocale — sans configuration longue, sans téléchargement séparé."
     },
     pt: {
       heroTitle: '<span class="hero-line-main">O seu agente imobiliário pessoal com IA.</span><span class="hero-line-accent">Inteligência global. Experiência local.</span>',
@@ -4385,26 +4642,24 @@
       card1Body: 'Para cada imóvel, terreno ou negócio, a Alla dá-lhe o custo total de entrada, um valor de saída realista e os riscos que poderiam alterar qualquer um dos números — não uma descrição de anúncio reformulada.',
       card2Title: 'Várias estratégias de propriedade comparadas lado a lado',
       card2Body: 'Flip, compra para arrendar, ou um híbrido faseado — a Alla modela cada caminho para o mesmo imóvel e compara-os entre si, em vez de lhe dar uma única recomendação já pronta para aceitar sem mais.',
-      card3Title: 'Independente do inventário de qualquer agência',
-      card3Body: 'Como consultora pessoal, a Alla não é paga para o direcionar para um anúncio específico — avalia qualquer imóvel, terreno ou carteira que lhe traga pelos seus próprios números, esteja ou não na carteira de uma agência.',
-      card4Title: 'Inteligência jurídica, fiscal e urbanística incorporada',
-      card4Body: 'Lê o informe urbanístico, os dados cadastrais, o estado do registo — e diz-lhe claramente quais os riscos reais e quais os números que ainda precisam de verificação local.',
-      card5Title: 'Documentos de nível de investidor a pedido',
-      card5Body: 'Um memorando de viabilidade completo a pedido, estruturado como uma casa de investimento profissional o faria — baseado no que lhe forneceu, nunca inventado para parecer completo.',
-      card6Title: 'Um único agente, todos os lados do negócio',
-      card6Body: 'A mesma inteligência funciona como consultora pessoal de um comprador, copiloto de um agente em atividade, analista extra para uma equipa de agência, ou assistente no próprio site de uma agência.',
-      card7Title: 'Elimina o verdadeiro estrangulamento de uma transação',
-      card7Body: 'A parte lenta de um negócio normalmente não é encontrar o imóvel — é fazer a informação circular entre comprador, agente, advogado e banco. A Alla mantém isso a fluir em vez de esperar pela próxima chamada.',
-      card8Title: 'Nunca está fora de serviço',
-      card8Body: '78% dos compradores acabam por trabalhar com quem responde primeiro, e a agência média demora mais de 15 horas a responder a uma nova consulta (NAR / Inman, 2025). A Alla responde em segundos, a qualquer hora, no idioma do visitante.',
-      card9Title: 'Alcance nacional, profundidade ao nível da ilha',
-      card9Body: 'A Alla raciocina sobre os quadros fiscais e legais em qualquer parte de Espanha. A sua experiência mais profunda — zoneamento municipal, licenciamento turístico, o mercado de compradores não residentes — está nas Ilhas Baleares, e diz claramente quando uma questão precisa de verificação local além disso.',
-      card10Title: 'Multilingue por padrão',
-      card10Body: 'A Alla responde automaticamente no idioma em que o visitante escreve — ninguém precisa de escolher um idioma primeiro.',
-      card11Title: 'Gratuito para o visitante, pago pela agência',
-      card11Body: 'No site de uma agência, cada visitante tem uma conversa completa de nível analista sem custo para si — a subscrição é da agência, por isso nada se interpõe entre um lead e uma resposta real.',
-      card12Title: 'Implementado em minutos, funciona como uma app em qualquer lugar',
-      card12Body: 'Um único script incorpora a Alla em qualquer site de agência. No telemóvel, instala-se como uma app e aceita entrada de voz — sem configuração longa, sem download separado.'
+      card3Title: 'Inteligência jurídica, fiscal e urbanística incorporada',
+      card3Body: 'Lê o informe urbanístico, os dados cadastrais, o estado do registo — e diz-lhe claramente quais os riscos reais e quais os números que ainda precisam de verificação local.',
+      card4Title: 'Documentos de nível de investidor a pedido',
+      card4Body: 'Um memorando de viabilidade completo a pedido, estruturado como uma casa de investimento profissional o faria — baseado no que lhe forneceu, nunca inventado para parecer completo.',
+      card5Title: 'Um único agente, todos os lados do negócio',
+      card5Body: 'A mesma inteligência funciona como consultora pessoal de um comprador, copiloto de um agente em atividade, analista extra para uma equipa de agência, ou assistente no próprio site de uma agência.',
+      card6Title: 'Elimina o verdadeiro estrangulamento de uma transação',
+      card6Body: 'A parte lenta de um negócio normalmente não é encontrar o imóvel — é fazer a informação circular entre comprador, agente, advogado e banco. A Alla mantém isso a fluir em vez de esperar pela próxima chamada.',
+      card7Title: 'Nunca está fora de serviço',
+      card7Body: '78% dos compradores acabam por trabalhar com quem responde primeiro, e a agência média demora mais de 15 horas a responder a uma nova consulta (NAR / Inman, 2025). A Alla responde em segundos, a qualquer hora, no idioma do visitante.',
+      card8Title: 'Alcance nacional, até ao município',
+      card8Body: 'A Alla raciocina sobre os quadros fiscais e legais em qualquer parte de Espanha, ao nível em que um negócio é realmente decidido: a região, a cidade, o município concreto e o seu próprio ordenamento, e não uma ilha ou província inteira. Diz onde o seu conhecimento do terreno é mais profundo e, com a mesma clareza, quando uma questão precisa de verificação local.',
+      card9Title: 'Multilingue por padrão',
+      card9Body: 'A Alla responde automaticamente no idioma em que o visitante escreve — ninguém precisa de escolher um idioma primeiro. Peça-lhe para continuar noutro idioma e ela muda, e redige os documentos no idioma em que forem necessários.',
+      card10Title: 'Gratuito para o visitante, pago pela agência',
+      card10Body: 'No site de uma agência, cada visitante tem uma conversa completa de nível analista sem custo para si — a subscrição é da agência, por isso nada se interpõe entre um lead e uma resposta real.',
+      card11Title: 'Implementado em minutos, funciona como uma app em qualquer lugar',
+      card11Body: 'Um único script incorpora a Alla em qualquer site de agência. No telemóvel, instala-se como uma app e aceita entrada de voz — sem configuração longa, sem download separado.'
     },
     it: {
       heroTitle: '<span class="hero-line-main">Il tuo agente immobiliare personale con IA.</span><span class="hero-line-accent">Intelligenza globale. Competenza locale.</span>',
@@ -4465,26 +4720,24 @@
       card1Body: "Per ogni immobile, terreno o affare, Alla ti dà il costo di ingresso completo, un valore di uscita realistico e i rischi che potrebbero far cambiare l'una o l'altra cifra — non una descrizione da annuncio riformulata.",
       card2Title: 'Più strategie di proprietà messe a confronto',
       card2Body: "Flip, acquisto per affittare, o un ibrido a fasi — Alla modella ciascun percorso per lo stesso immobile e li confronta tra loro, invece di darti un'unica raccomandazione già pronta da accettare sulla fiducia.",
-      card3Title: "Indipendente dall'inventario di una singola agenzia",
-      card3Body: "Come consulente personale, Alla non viene pagata per indirizzarti verso un annuncio specifico — valuta qualsiasi immobile, terreno o portafoglio che le porti in base ai suoi stessi numeri, che sia o meno nel portafoglio di un'agenzia.",
-      card4Title: 'Intelligenza legale, fiscale e urbanistica integrata',
-      card4Body: "Legge l'informe urbanístico, i dati catastali, lo stato di registrazione — e ti dice chiaramente quali rischi sono reali e quali cifre necessitano ancora di verifica locale.",
-      card5Title: 'Documenti di livello investitore su richiesta',
-      card5Body: "Un memorandum di fattibilità completo su richiesta, strutturato come lo farebbe una casa di investimento professionale — basato su ciò che le hai fornito, mai inventato per sembrare completo.",
-      card6Title: "Un'unica consulente, ogni lato dell'affare",
-      card6Body: "La stessa intelligenza funziona come consulente personale di un acquirente, copilota di un agente attivo, analista aggiuntiva per il team di un'agenzia, o assistente sul sito web di un'agenzia.",
-      card7Title: "Elimina il vero collo di bottiglia di una transazione",
-      card7Body: "La parte lenta di un affare di solito non è trovare l'immobile — è far circolare le informazioni tra acquirente, agente, avvocato e banca. Alla mantiene questo flusso invece di aspettare la prossima chiamata.",
-      card8Title: 'Mai fuori servizio',
-      card8Body: "Il 78% degli acquirenti finisce per lavorare con chi risponde per primo, e l'agenzia media impiega oltre 15 ore per rispondere a una nuova richiesta (NAR / Inman, 2025). Alla risponde in pochi secondi, a qualsiasi ora, nella lingua del visitatore.",
-      card9Title: 'Copertura nazionale, profondità a livello di isola',
-      card9Body: "Alla ragiona sui quadri fiscali e legali in qualsiasi parte della Spagna. La sua competenza più profonda — pianificazione urbanistica comunale, licenze turistiche, il mercato degli acquirenti non residenti — riguarda le Isole Baleari, e dice chiaramente quando una domanda richiede una verifica locale oltre a questo.",
-      card10Title: 'Multilingue per impostazione predefinita',
-      card10Body: "Alla risponde automaticamente nella lingua in cui scrive il visitatore — nessuno deve scegliere prima una lingua.",
-      card11Title: "Gratis per il visitatore, a carico dell'agenzia",
-      card11Body: "Sul sito di un'agenzia, ogni visitatore ha una conversazione completa di livello analista senza costi per lui — l'abbonamento è dell'agenzia, quindi nulla si frappone tra un lead e una risposta reale.",
-      card12Title: "Si implementa in pochi minuti, funziona come un'app ovunque",
-      card12Body: "Un unico script integra Alla su qualsiasi sito di agenzia. Sul telefono si installa come un'app e accetta input vocale — senza configurazioni lunghe, senza download separati."
+      card3Title: 'Intelligenza legale, fiscale e urbanistica integrata',
+      card3Body: "Legge l'informe urbanístico, i dati catastali, lo stato di registrazione — e ti dice chiaramente quali rischi sono reali e quali cifre necessitano ancora di verifica locale.",
+      card4Title: 'Documenti di livello investitore su richiesta',
+      card4Body: "Un memorandum di fattibilità completo su richiesta, strutturato come lo farebbe una casa di investimento professionale — basato su ciò che le hai fornito, mai inventato per sembrare completo.",
+      card5Title: "Un'unica consulente, ogni lato dell'affare",
+      card5Body: "La stessa intelligenza funziona come consulente personale di un acquirente, copilota di un agente attivo, analista aggiuntiva per il team di un'agenzia, o assistente sul sito web di un'agenzia.",
+      card6Title: "Elimina il vero collo di bottiglia di una transazione",
+      card6Body: "La parte lenta di un affare di solito non è trovare l'immobile — è far circolare le informazioni tra acquirente, agente, avvocato e banca. Alla mantiene questo flusso invece di aspettare la prossima chiamata.",
+      card7Title: 'Mai fuori servizio',
+      card7Body: "Il 78% degli acquirenti finisce per lavorare con chi risponde per primo, e l'agenzia media impiega oltre 15 ore per rispondere a una nuova richiesta (NAR / Inman, 2025). Alla risponde in pochi secondi, a qualsiasi ora, nella lingua del visitatore.",
+      card8Title: 'Copertura nazionale, fino al comune',
+      card8Body: "Alla ragiona sui quadri fiscali e legali in qualsiasi parte della Spagna, al livello in cui un affare si decide davvero: la regione, la città, il singolo comune e la sua urbanistica, non un'intera isola o provincia. Dice dove la sua conoscenza del territorio è più profonda e, con la stessa chiarezza, quando una domanda richiede una verifica locale.",
+      card9Title: 'Multilingue per impostazione predefinita',
+      card9Body: "Alla risponde automaticamente nella lingua in cui scrive il visitatore — nessuno deve scegliere prima una lingua. Chiedile di proseguire in un'altra lingua e ci passa, e redige i documenti nella lingua in cui servono.",
+      card10Title: "Gratis per il visitatore, a carico dell'agenzia",
+      card10Body: "Sul sito di un'agenzia, ogni visitatore ha una conversazione completa di livello analista senza costi per lui — l'abbonamento è dell'agenzia, quindi nulla si frappone tra un lead e una risposta reale.",
+      card11Title: "Si implementa in pochi minuti, funziona come un'app ovunque",
+      card11Body: "Un unico script integra Alla su qualsiasi sito di agenzia. Sul telefono si installa come un'app e accetta input vocale — senza configurazioni lunghe, senza download separati."
     }
   };
 
@@ -4510,7 +4763,7 @@
   setHtml("hero-title", T.heroTitle);
   setText("hero-tagline", T.heroTagline);
   setText("why-h2", T.whyH2);
-  for (var wc = 1; wc <= 12; wc++) {
+  for (var wc = 1; wc <= 11; wc++) {
     setText("card" + wc + "-title", T["card" + wc + "Title"]);
     setText("card" + wc + "-body", T["card" + wc + "Body"]);
   }
@@ -5442,6 +5695,13 @@
         go.className = "side-signin";
         go.href = "account.html";
         go.textContent = t("signInLabel", "Sign in");
+        go.addEventListener("click", function (e) {
+          if (!window.__allaSignIn) return;   // without the sheet, the link still works
+          e.preventDefault();
+          window.__allaSignIn().then(function (took) {
+            if (!took) location.href = go.getAttribute("href");
+          });
+        });
         tree.appendChild(go);
         return;
       }
@@ -5808,7 +6068,23 @@
         : ((window.__allaT || {}).signInLabel || "Sign in");
       corner.title = label;
       corner.setAttribute("aria-label", label);
+      // Signed in, the circle is the door to the cabinet. Signed out, it is
+      // the door in — and that opens here, over the page, rather than sending
+      // someone to another page and losing where they were.
+      corner.dataset.signedIn = signedIn ? "1" : "0";
       corner.classList.add("on");
+    }
+
+    if (corner) {
+      corner.addEventListener("click", function (e) {
+        if (corner.dataset.signedIn === "1") return;      // let the link go to the cabinet
+        if (!window.__allaSignIn) return;                 // sheet missing: the link still works
+        e.preventDefault();
+        window.__allaSignIn().then(function (took) {
+          // No door open yet: fall through to the page that still has one.
+          if (!took) location.href = corner.getAttribute("href");
+        });
+      });
     }
 
     fetch("/api/account", { credentials: "same-origin" })
@@ -5856,5 +6132,422 @@
   }
 </script>
 
+<script>
+// ============================ the way in ============================
+//
+// Signing in and registering are one road. A person gives an address, proves
+// it once with a code, and is in — or presses the Google button and is in
+// without even that. Nothing here asks for a password, because a password is
+// a thing to forget, a thing to reuse, and a thing to leak, and it buys us
+// nothing that a proven address does not.
+//
+// The code is only ever the FIRST arrival on a device. After it, the ordinary
+// session cookie carries the person, and that cookie now renews itself while
+// it is in use, so a working device stops asking altogether.
+//
+// One exception is kept deliberately: while no mail sender is configured the
+// sheet falls back to the old password form, because a sign-in screen that
+// cannot sign anyone in is worse than an old-fashioned one.
+(function () {
+  var L = (document.documentElement.lang || "en").slice(0, 2);
+
+  var S = {
+    en: {
+      title: "Sign in", done: "One more thing",
+      intro: "Alla remembers your conversations, your projects and what matters to you — on every device you sign in from.",
+      introPhone: "A number to reach you on, so a conversation about a property can turn into a call.",
+      google: "Continue with Google", or: "or",
+      name: "Your name", email: "Email", phone: "Telephone",
+      phoneHint: "With the country code, or without it for a Spanish number.",
+      send: "Send me a code", code: "The code from the email",
+      codeHint: "Six digits, sent to %s. Good for ten minutes.",
+      go: "Continue", save: "Save", resend: "Send it again", wait: "You can ask again in %s s",
+      sending: "Sending…", checking: "Checking…",
+      legal: 'By continuing you accept the <a href="terms.html">Terms</a> and the <a href="privacy.html">Privacy Policy</a>.',
+      errEmail: "That address does not look right.",
+      errPhone: "That number does not look right. Include the country code if it is not Spanish.",
+      errCode: "That code is not right.",
+      errExpired: "That code has expired. Ask for a new one.",
+      errMany: "Too many tries. Ask for a new code.",
+      errWait: "A code has just been sent. Give it a moment.",
+      errMail: "Sending by email is not switched on yet.",
+      errAny: "That did not work. Try again in a moment.",
+      errDeclined: "Google sign-in was cancelled.",
+    },
+    es: {
+      title: "Entrar", done: "Una cosa más",
+      intro: "Alla recuerda tus conversaciones, tus proyectos y lo que te importa — en cualquier dispositivo donde entres.",
+      introPhone: "Un número para localizarte, para que una conversación sobre un inmueble pueda convertirse en una llamada.",
+      google: "Continuar con Google", or: "o",
+      name: "Tu nombre", email: "Correo electrónico", phone: "Teléfono",
+      phoneHint: "Con prefijo de país, o sin él si es un número español.",
+      send: "Enviarme un código", code: "El código del correo",
+      codeHint: "Seis cifras, enviadas a %s. Válido diez minutos.",
+      go: "Continuar", save: "Guardar", resend: "Enviarlo de nuevo", wait: "Puedes pedirlo de nuevo en %s s",
+      sending: "Enviando…", checking: "Comprobando…",
+      legal: 'Al continuar aceptas los <a href="terms.html">Términos</a> y la <a href="privacy.html">Política de Privacidad</a>.',
+      errEmail: "Esa dirección no parece correcta.",
+      errPhone: "Ese número no parece correcto. Incluye el prefijo si no es español.",
+      errCode: "Ese código no es correcto.",
+      errExpired: "El código ha caducado. Pide uno nuevo.",
+      errMany: "Demasiados intentos. Pide un código nuevo.",
+      errWait: "Acabamos de enviar un código. Espera un momento.",
+      errMail: "El envío por correo todavía no está activado.",
+      errAny: "No ha funcionado. Inténtalo de nuevo en un momento.",
+      errDeclined: "Se ha cancelado el acceso con Google.",
+    },
+    ru: {
+      title: "Вход", done: "Ещё одно",
+      intro: "Алла помнит ваши разговоры, ваши проекты и то, что для вас важно — на любом устройстве, где вы вошли.",
+      introPhone: "Номер, по которому с вами можно связаться, чтобы разговор об объекте мог перейти в звонок.",
+      google: "Продолжить с Google", or: "или",
+      name: "Ваше имя", email: "Электронная почта", phone: "Телефон",
+      phoneHint: "С кодом страны — или без него, если номер испанский.",
+      send: "Прислать код", code: "Код из письма",
+      codeHint: "Шесть цифр, отправлены на %s. Действует десять минут.",
+      go: "Продолжить", save: "Сохранить", resend: "Отправить ещё раз", wait: "Можно запросить снова через %s с",
+      sending: "Отправляем…", checking: "Проверяем…",
+      legal: 'Продолжая, вы принимаете <a href="terms.html">Условия</a> и <a href="privacy.html">Политику конфиденциальности</a>.',
+      errEmail: "Этот адрес выглядит неправильно.",
+      errPhone: "Номер выглядит неправильно. Укажите код страны, если он не испанский.",
+      errCode: "Код неверный.",
+      errExpired: "Срок кода истёк. Запросите новый.",
+      errMany: "Слишком много попыток. Запросите новый код.",
+      errWait: "Код только что отправлен. Подождите немного.",
+      errMail: "Отправка писем ещё не включена.",
+      errAny: "Не получилось. Попробуйте через минуту.",
+      errDeclined: "Вход через Google отменён.",
+    },
+    de: {
+      title: "Anmelden", done: "Noch eines",
+      intro: "Alla merkt sich Ihre Gespräche, Ihre Projekte und was Ihnen wichtig ist — auf jedem Gerät, an dem Sie sich anmelden.",
+      introPhone: "Eine Nummer, unter der wir Sie erreichen, damit aus einem Gespräch über eine Immobilie ein Anruf werden kann.",
+      google: "Weiter mit Google", or: "oder",
+      name: "Ihr Name", email: "E-Mail", phone: "Telefon",
+      phoneHint: "Mit Ländervorwahl — oder ohne, wenn es eine spanische Nummer ist.",
+      send: "Code schicken", code: "Der Code aus der E-Mail",
+      codeHint: "Sechs Ziffern, gesendet an %s. Zehn Minuten gültig.",
+      go: "Weiter", save: "Speichern", resend: "Erneut senden", wait: "Erneut möglich in %s s",
+      sending: "Wird gesendet…", checking: "Wird geprüft…",
+      legal: 'Mit dem Fortfahren akzeptieren Sie die <a href="terms.html">Nutzungsbedingungen</a> und die <a href="privacy.html">Datenschutzerklärung</a>.',
+      errEmail: "Diese Adresse sieht nicht richtig aus.",
+      errPhone: "Diese Nummer sieht nicht richtig aus. Mit Ländervorwahl, wenn sie nicht spanisch ist.",
+      errCode: "Dieser Code stimmt nicht.",
+      errExpired: "Der Code ist abgelaufen. Fordern Sie einen neuen an.",
+      errMany: "Zu viele Versuche. Fordern Sie einen neuen Code an.",
+      errWait: "Gerade wurde ein Code gesendet. Einen Moment bitte.",
+      errMail: "Der E-Mail-Versand ist noch nicht eingeschaltet.",
+      errAny: "Das hat nicht geklappt. Versuchen Sie es gleich noch einmal.",
+      errDeclined: "Die Anmeldung mit Google wurde abgebrochen.",
+    },
+    fr: {
+      title: "Se connecter", done: "Encore une chose",
+      intro: "Alla retient vos conversations, vos projets et ce qui compte pour vous — sur chaque appareil où vous vous connectez.",
+      introPhone: "Un numéro pour vous joindre, afin qu'une conversation sur un bien puisse devenir un appel.",
+      google: "Continuer avec Google", or: "ou",
+      name: "Votre nom", email: "E-mail", phone: "Téléphone",
+      phoneHint: "Avec l'indicatif du pays, ou sans si le numéro est espagnol.",
+      send: "M'envoyer un code", code: "Le code reçu par e-mail",
+      codeHint: "Six chiffres, envoyés à %s. Valable dix minutes.",
+      go: "Continuer", save: "Enregistrer", resend: "Renvoyer", wait: "Vous pourrez redemander dans %s s",
+      sending: "Envoi…", checking: "Vérification…",
+      legal: 'En continuant, vous acceptez les <a href="terms.html">Conditions</a> et la <a href="privacy.html">Politique de confidentialité</a>.',
+      errEmail: "Cette adresse ne semble pas correcte.",
+      errPhone: "Ce numéro ne semble pas correct. Ajoutez l'indicatif s'il n'est pas espagnol.",
+      errCode: "Ce code n'est pas correct.",
+      errExpired: "Ce code a expiré. Demandez-en un nouveau.",
+      errMany: "Trop de tentatives. Demandez un nouveau code.",
+      errWait: "Un code vient d'être envoyé. Patientez un instant.",
+      errMail: "L'envoi par e-mail n'est pas encore activé.",
+      errAny: "Cela n'a pas fonctionné. Réessayez dans un instant.",
+      errDeclined: "La connexion avec Google a été annulée.",
+    },
+    pt: {
+      title: "Entrar", done: "Mais uma coisa",
+      intro: "A Alla lembra-se das suas conversas, dos seus projetos e do que lhe importa — em qualquer dispositivo onde entre.",
+      introPhone: "Um número para o contactarmos, para que uma conversa sobre um imóvel possa passar a uma chamada.",
+      google: "Continuar com Google", or: "ou",
+      name: "O seu nome", email: "E-mail", phone: "Telefone",
+      phoneHint: "Com indicativo do país, ou sem ele se for um número espanhol.",
+      send: "Enviar-me um código", code: "O código do e-mail",
+      codeHint: "Seis dígitos, enviados para %s. Válido dez minutos.",
+      go: "Continuar", save: "Guardar", resend: "Enviar de novo", wait: "Pode pedir de novo dentro de %s s",
+      sending: "A enviar…", checking: "A verificar…",
+      legal: 'Ao continuar aceita os <a href="terms.html">Termos</a> e a <a href="privacy.html">Política de Privacidade</a>.',
+      errEmail: "Esse endereço não parece correto.",
+      errPhone: "Esse número não parece correto. Inclua o indicativo se não for espanhol.",
+      errCode: "Esse código não está correto.",
+      errExpired: "O código expirou. Peça um novo.",
+      errMany: "Demasiadas tentativas. Peça um código novo.",
+      errWait: "Acabámos de enviar um código. Aguarde um momento.",
+      errMail: "O envio por e-mail ainda não está ativo.",
+      errAny: "Não resultou. Tente de novo daqui a pouco.",
+      errDeclined: "O acesso com Google foi cancelado.",
+    },
+    it: {
+      title: "Accedi", done: "Ancora una cosa",
+      intro: "Alla ricorda le tue conversazioni, i tuoi progetti e ciò che conta per te — su ogni dispositivo da cui accedi.",
+      introPhone: "Un numero per raggiungerti, così che una conversazione su un immobile possa diventare una telefonata.",
+      google: "Continua con Google", or: "o",
+      name: "Il tuo nome", email: "E-mail", phone: "Telefono",
+      phoneHint: "Con il prefisso internazionale, o senza se il numero è spagnolo.",
+      send: "Mandami un codice", code: "Il codice ricevuto per e-mail",
+      codeHint: "Sei cifre, inviate a %s. Valido dieci minuti.",
+      go: "Continua", save: "Salva", resend: "Invia di nuovo", wait: "Puoi richiederlo tra %s s",
+      sending: "Invio…", checking: "Verifica…",
+      legal: 'Continuando accetti i <a href="terms.html">Termini</a> e l\'<a href="privacy.html">Informativa sulla privacy</a>.',
+      errEmail: "Questo indirizzo non sembra corretto.",
+      errPhone: "Questo numero non sembra corretto. Aggiungi il prefisso se non è spagnolo.",
+      errCode: "Questo codice non è corretto.",
+      errExpired: "Il codice è scaduto. Chiedine uno nuovo.",
+      errMany: "Troppi tentativi. Chiedi un nuovo codice.",
+      errWait: "Un codice è appena stato inviato. Attendi un momento.",
+      errMail: "L'invio per e-mail non è ancora attivo.",
+      errAny: "Non ha funzionato. Riprova tra poco.",
+      errDeclined: "L'accesso con Google è stato annullato.",
+    },
+  };
+  var W = S[L] || S.en;
+
+  var el = function (id) { return document.getElementById(id); };
+  var veil = el("signin-veil");
+  if (!veil) return;
+
+  var steps = { start: el("si-step-start"), code: el("si-step-code"), phone: el("si-step-phone") };
+  var msg = el("si-msg");
+  var pending = { email: "", name: "", phone: "" };
+  var ways = null;
+  var timer = null;
+
+  // ---------- painting it in the visitor's language ----------
+  function paint() {
+    el("si-title").textContent = W.title;
+    el("si-intro").textContent = W.intro;
+    el("si-google-text").textContent = W.google;
+    el("si-or-text").textContent = W.or;
+    el("si-name-label").textContent = W.name;
+    el("si-email-label").textContent = W.email;
+    el("si-phone-label").textContent = W.phone;
+    el("si-phone-hint").textContent = W.phoneHint;
+    el("si-send").textContent = W.send;
+    el("si-code-label").textContent = W.code;
+    el("si-verify").textContent = W.go;
+    el("si-resend").textContent = W.resend;
+    el("si-phone2-label").textContent = W.phone;
+    el("si-phone2-hint").textContent = W.phoneHint;
+    el("si-phone-save").textContent = W.save;
+    el("si-legal").innerHTML = W.legal;
+    el("si-close").setAttribute("aria-label", W.title);
+  }
+
+  function say(text, bad) {
+    msg.textContent = text || "";
+    msg.className = "sheet-msg" + (bad ? " bad" : "");
+  }
+
+  function show(which) {
+    for (var k in steps) if (steps[k]) steps[k].hidden = k !== which;
+    el("si-intro").textContent = which === "phone" ? W.introPhone : W.intro;
+    el("si-title").textContent = which === "phone" ? W.done : W.title;
+    // The number is the last thing standing between them and the answer they
+    // came for, so the sheet cannot be dismissed at that step.
+    el("si-close").hidden = which === "phone";
+    el("si-legal").hidden = which !== "start";
+  }
+
+  function open(which) {
+    paint();
+    say("");
+    // Said here rather than in loadWays, because opening the sheet clears the
+    // message and would otherwise wipe the one explanation that matters.
+    if (ways && !ways.email && (which || "start") === "start") say(W.errMail, true);
+    show(which || "start");
+    veil.classList.add("open");
+    var first = which === "phone" ? el("si-phone2") : el("si-email");
+    setTimeout(function () { try { first.focus(); } catch (e) {} }, 60);
+  }
+
+  function close() {
+    veil.classList.remove("open");
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  // ---------- which doors exist ----------
+  function loadWays() {
+    return fetch("/api/auth/ways", { headers: { accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (w) {
+        ways = w || { providers: [], email: false };
+        var hasGoogle = (ways.providers || []).indexOf("google") >= 0;
+        el("si-google").hidden = !hasGoogle;
+        el("si-or").hidden = !hasGoogle;
+        // No mail sender yet: the button goes dead rather than letting someone
+        // press it and wait for a letter that is never coming. open() says why.
+        el("si-send").disabled = !ways.email;
+        return ways;
+      })
+      .catch(function () { ways = { providers: [], email: false }; return ways; });
+  }
+
+  // ---------- step 1 -> 2 ----------
+  function countdown(seconds) {
+    var left = seconds;
+    var b = el("si-resend");
+    if (timer) clearInterval(timer);
+    function tick() {
+      if (left <= 0) {
+        clearInterval(timer); timer = null;
+        b.disabled = false; b.textContent = W.resend;
+        return;
+      }
+      b.disabled = true;
+      b.textContent = W.wait.replace("%s", left);
+      left--;
+    }
+    tick();
+    timer = setInterval(tick, 1000);
+  }
+
+  var ERRORS = {
+    invalid_email: "errEmail", invalid_phone: "errPhone",
+    invalid_code: "errCode", code_expired: "errExpired",
+    too_many_attempts: "errMany", too_many_requests: "errMany",
+    wait_before_resend: "errWait",
+    email_not_configured: "errMail", email_send_failed: "errMail",
+    declined: "errDeclined",
+  };
+  function complain(code) { say(W[ERRORS[code] || "errAny"], true); }
+
+  function post(path, body) {
+    return fetch(path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(body),
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (b) {
+        return { ok: r.ok, body: b || {} };
+      });
+    });
+  }
+
+  function requestCode(resend) {
+    var email = el("si-email").value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say(W.errEmail, true); return; }
+    pending.email = email;
+    pending.name = el("si-name").value.trim();
+    pending.phone = el("si-phone").value.trim();
+
+    var btn = resend ? el("si-resend") : el("si-send");
+    btn.disabled = true;
+    if (!resend) btn.textContent = W.sending;
+    say("");
+
+    post("/api/auth/code/request", { email: email, lang: L }).then(function (r) {
+      if (!resend) { btn.disabled = false; btn.textContent = W.send; }
+      if (!r.ok) { complain(r.body.error); if (resend) countdown(5); return; }
+      el("si-code-hint").textContent = W.codeHint.replace("%s", email);
+      show("code");
+      el("si-code").value = "";
+      setTimeout(function () { try { el("si-code").focus(); } catch (e) {} }, 60);
+      countdown(r.body.wait || 45);
+    }).catch(function () {
+      if (!resend) { btn.disabled = false; btn.textContent = W.send; }
+      say(W.errAny, true);
+    });
+  }
+
+  el("si-email-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    requestCode(false);
+  });
+  el("si-resend").addEventListener("click", function () { requestCode(true); });
+
+  // ---------- step 2 -> in ----------
+  el("si-code-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var code = el("si-code").value.replace(/\D/g, "");
+    if (code.length !== 6) { say(W.errCode, true); return; }
+    var btn = el("si-verify");
+    btn.disabled = true; btn.textContent = W.checking;
+    say("");
+    post("/api/auth/code/verify", {
+      email: pending.email, code: code,
+      name: pending.name || undefined,
+      phone: pending.phone || undefined,
+      lang: L,
+    }).then(function (r) {
+      btn.disabled = false; btn.textContent = W.go;
+      if (!r.ok) {
+        complain(r.body.error);
+        if (r.body.error === "code_expired" || r.body.error === "too_many_attempts") show("start");
+        return;
+      }
+      if (r.body.needsPhone) { show("phone"); say(""); return; }
+      arrived();
+    }).catch(function () {
+      btn.disabled = false; btn.textContent = W.go;
+      say(W.errAny, true);
+    });
+  });
+
+  // ---------- step 3 ----------
+  el("si-phone-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var btn = el("si-phone-save");
+    btn.disabled = true;
+    say("");
+    post("/api/account/phone", { phone: el("si-phone2").value, lang: L }).then(function (r) {
+      btn.disabled = false;
+      if (!r.ok) { complain(r.body.error); return; }
+      arrived();
+    }).catch(function () { btn.disabled = false; say(W.errAny, true); });
+  });
+
+  // Reloading is the honest way to land inside: the conversation, the panel
+  // and the corner all read the session at load, and re-deriving each of them
+  // by hand here would be three more places to get out of step.
+  function arrived() {
+    var u = new URL(location.href);
+    u.searchParams.delete("need_phone");
+    u.searchParams.delete("signin_error");
+    location.replace(u.toString());
+  }
+
+  el("si-close").addEventListener("click", close);
+  veil.addEventListener("click", function (e) {
+    if (e.target === veil && el("si-close").hidden !== true) close();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && veil.classList.contains("open") && el("si-close").hidden !== true) close();
+  });
+
+  // ---------- the ways other parts of the page open this ----------
+  //
+  // Returns a promise for whether the sheet took the job. If there is no door
+  // at all yet — no provider configured and no mail sender — it takes nothing
+  // and the caller lets its ordinary link through to the cabinet page, which
+  // still has the older form. A sheet that cannot sign anyone in must not be
+  // allowed to stand in front of the one thing that can.
+  window.__allaSignIn = function () {
+    return loadWays().then(function (w) {
+      if (!w.email && !(w.providers || []).length) return false;
+      open("start");
+      return true;
+    });
+  };
+
+  // Coming back from Google: either a number is still owed, or something went
+  // wrong on the way and the person deserves to be told which.
+  (function () {
+    var q = new URLSearchParams(location.search);
+    if (q.get("need_phone") === "1") { paint(); open("phone"); return; }
+    var err = q.get("signin_error");
+    if (err) {
+      loadWays().then(function () { open("start"); complain(err); });
+    }
+  })();
+})();
+</script>
 </body>
 </html>
