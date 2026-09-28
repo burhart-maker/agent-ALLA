@@ -184,6 +184,23 @@ const CORE_INSTRUCTIONS = [
   "remains the Balearic Islands (Menorca, Ibiza, Mallorca — always three ",
   "distinct markets), but that is a head start, not a boundary: extend the same ",
   "depth of resolution to every other region on demand.\n\n",
+  "Go to the last instance, not the nearest summary. The body that actually ",
+  "decides a municipal question is that municipality's own ayuntamiento / ",
+  "ajuntament — its sede electrónica, its own published PGOU or normas ",
+  "subsidiarias, its ordenanzas, its licence and tax schedules — and that is ",
+  "where the answer must come from. A regional portal, a law firm's blog, a ",
+  "news article, an aggregator or a general summary is a signpost to it, never ",
+  "a substitute for it. So: name the municipality, search for its own source, ",
+  "follow the chain until you reach the document that carries legal force, and ",
+  "report the figure with the document it came from and the date that document ",
+  "carries. Where a municipality's rule is currently being revised, say that ",
+  "the revision exists and what it would change. If, after genuinely trying, ",
+  "you could not reach that municipality's own source, say exactly that — that ",
+  "you could not reach the ajuntament's own document — rather than presenting a ",
+  "second-hand figure as if it were municipal fact, and tell the person which ",
+  "department to call. A confident answer that did not come from the ",
+  "municipality itself is the single worst failure available to you here, ",
+  "because it is the one the client will act on.\n\n",
   "Digging for the truth, and how old your knowledge is: you have a live ",
   "web_search tool. Anything carrying a rate, a threshold, a deadline, a licence ",
   "status or a price is time-sensitive, and what you remember may be years out ",
@@ -1481,6 +1498,596 @@ async function transcribe(request, env, cfg, ctx, key) {
   return jsonOk({ text });
 }
 
+
+// ---------- ways in ----------
+//
+// Three doors, one room. A person may arrive through Google, or by asking for
+// a six-digit code at their own address; either way they land on the same
+// account, keyed by the email, and everything Alla remembers about them is
+// already there.
+//
+// Two rules hold this together, and both are security rather than taste:
+//
+//   * An external account is matched by the PROVIDER'S OWN ID, never by the
+//     email alone. Emails change hands; a Google `sub` does not. The email is
+//     used to join an existing account only when the provider states it has
+//     verified it — otherwise anyone able to claim an address at a sloppy
+//     provider could walk into someone else's account.
+//   * A code is stored hashed and dies on first use, like a session token.
+//     A database that leaks must not hand over working codes.
+//
+// Apple and Google Play are the same shape: one more row in PROVIDERS and one
+// more pair of secrets. Nothing below is written specifically to Google except
+// the endpoints in that row.
+
+const CODE_TTL_SEC = 10 * 60;        // long enough to find the email, short enough to matter
+const CODE_ATTEMPTS_MAX = 5;         // wrong guesses before the code is burned
+const CODE_RESEND_WAIT = 45;         // seconds between two sends to one address
+const CODE_SENDS_PER_HOUR = 5;       // per address
+const CODE_REQUESTS_PER_IP_HOUR = 20;
+const OAUTH_STATE_COOKIE = "alla_oauth";
+const OAUTH_STATE_TTL = 600;
+
+// ---------- who we let people in with ----------
+
+const PROVIDERS = {
+  google: {
+    authorize: "https://accounts.google.com/o/oauth2/v2/auth",
+    token: "https://oauth2.googleapis.com/token",
+    jwks: "https://www.googleapis.com/oauth2/v3/certs",
+    issuers: ["https://accounts.google.com", "accounts.google.com"],
+    scope: "openid email profile",
+    idEnv: "GOOGLE_CLIENT_ID",
+    secretEnv: "GOOGLE_CLIENT_SECRET",
+  },
+  // apple: filled in once the Developer Program registration is through. Its
+  // client secret is a signed JWT that has to be minted and rotated, which is
+  // the only real difference from the row above.
+};
+
+function providerConfigured(env, name) {
+  const p = PROVIDERS[name];
+  return !!(p && env && env[p.idEnv] && env[p.secretEnv]);
+}
+
+// Which doors the sign-in sheet should draw. Nothing here reveals a secret —
+// only whether a door exists.
+function waysIn(env) {
+  const out = [];
+  for (const name of Object.keys(PROVIDERS)) if (providerConfigured(env, name)) out.push(name);
+  return out;
+}
+
+// ---------- the telephone ----------
+//
+// Kept in E.164, because a number written as "600 12 34 56" is worth nothing
+// to whoever has to dial it from another country. When the person has not
+// written a country code we add the one their language suggests — Spanish
+// pages are read in Spain far more often than anywhere else — and say so on
+// screen rather than guessing silently.
+
+const DIAL_BY_LANG = { es: "34", ca: "34", ru: "34", en: "34", de: "49", fr: "33", pt: "351", it: "39" };
+
+function normalisePhone(raw, langHint) {
+  if (typeof raw !== "string") return null;
+  let s = raw.replace(/[^\d+]/g, "");
+  if (!s) return null;
+  if (s.startsWith("00")) s = "+" + s.slice(2);
+  if (!s.startsWith("+")) {
+    // A Spanish number written with the trunk prefix, or a bare national number.
+    const dial = DIAL_BY_LANG[String(langHint || "").slice(0, 2)] || "34";
+    s = "+" + dial + s.replace(/^0+/, "");
+  }
+  const digits = s.slice(1);
+  if (!/^\d{7,15}$/.test(digits)) return null;   // E.164 allows at most 15
+  return "+" + digits;
+}
+
+// ---------- sending the code ----------
+//
+// One provider today, behind one function, so swapping it is one edit. Without
+// a key the endpoint says so plainly instead of pretending the letter went.
+
+async function sendMail(env, to, subject, text, html) {
+  if (!env.RESEND_API_KEY) return { ok: false, error: "email_not_configured" };
+  try {
+    // The address is a variable so the sender can be swapped, and so the
+    // sign-in road can be driven end to end against a local stand-in rather
+    // than being the one part of the system nobody ever tests.
+    const r = await fetch(env.MAIL_ENDPOINT || "https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer " + env.RESEND_API_KEY,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        from: env.MAIL_FROM || "Agent Alla <hola@agentalla.com>",
+        to: [to],
+        subject,
+        text,
+        html,
+      }),
+    });
+    if (!r.ok) {
+      // The provider's own message can contain the address and the key's id;
+      // neither belongs in a response to the browser or in a log line.
+      return { ok: false, error: "email_send_failed", status: r.status };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: "email_send_failed" };
+  }
+}
+
+const CODE_MAIL = {
+  en: {
+    subject: (c) => c + " — your Agent Alla code",
+    line1: "Here is your sign-in code:",
+    line2: "It works for ten minutes, once.",
+    line3: "If you did not ask for it, nothing has happened and you can ignore this message.",
+  },
+  es: {
+    subject: (c) => c + " — tu código de Agent Alla",
+    line1: "Este es tu código de acceso:",
+    line2: "Sirve durante diez minutos, una sola vez.",
+    line3: "Si no lo has pedido, no ha ocurrido nada y puedes ignorar este mensaje.",
+  },
+  ru: {
+    subject: (c) => c + " — код входа в Agent Alla",
+    line1: "Ваш код для входа:",
+    line2: "Он действует десять минут и только один раз.",
+    line3: "Если вы его не запрашивали, ничего не произошло — просто не обращайте внимания.",
+  },
+  de: {
+    subject: (c) => c + " — Ihr Agent-Alla-Code",
+    line1: "Hier ist Ihr Anmeldecode:",
+    line2: "Er gilt zehn Minuten lang, einmalig.",
+    line3: "Wenn Sie ihn nicht angefordert haben, ist nichts geschehen und Sie können diese Nachricht ignorieren.",
+  },
+  fr: {
+    subject: (c) => c + " — votre code Agent Alla",
+    line1: "Voici votre code de connexion :",
+    line2: "Il est valable dix minutes, une seule fois.",
+    line3: "Si vous ne l'avez pas demandé, rien ne s'est passé et vous pouvez ignorer ce message.",
+  },
+  pt: {
+    subject: (c) => c + " — o seu código do Agent Alla",
+    line1: "Este é o seu código de acesso:",
+    line2: "É válido durante dez minutos, uma única vez.",
+    line3: "Se não o pediu, nada aconteceu e pode ignorar esta mensagem.",
+  },
+  it: {
+    subject: (c) => c + " — il tuo codice Agent Alla",
+    line1: "Ecco il tuo codice di accesso:",
+    line2: "Vale dieci minuti, una volta sola.",
+    line3: "Se non l'hai richiesto, non è successo nulla e puoi ignorare questo messaggio.",
+  },
+};
+
+function codeMailBody(code, lang) {
+  const t = CODE_MAIL[String(lang || "en").slice(0, 2)] || CODE_MAIL.en;
+  const text = [t.line1, "", code, "", t.line2, "", t.line3].join("\n");
+  const html =
+    '<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#142129">' +
+    "<p>" + escapeHtmlText(t.line1) + "</p>" +
+    '<p style="font-size:34px;font-weight:700;letter-spacing:0.14em;margin:18px 0">' + code + "</p>" +
+    "<p>" + escapeHtmlText(t.line2) + "</p>" +
+    '<p style="color:#3b4a52;font-size:13px">' + escapeHtmlText(t.line3) + "</p>" +
+    '<p style="color:#3b4a52;font-size:13px">Agent AllA · agentalla.com</p>' +
+    "</div>";
+  return { subject: t.subject(code), text, html };
+}
+
+function escapeHtmlText(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// ---------- throttling ----------
+//
+// The IP is never stored: it is hashed together with the purpose and the hour,
+// exactly as the anonymous message counter already does.
+
+async function throttle(env, request, purpose, limitPerHour) {
+  try {
+    const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
+    const hour = Math.floor(nowSec() / 3600);
+    const key = await sha256Hex(ip + "|" + purpose + "|" + hour);
+    const row = await env.DB.prepare("SELECT count FROM auth_throttle WHERE key = ?").bind(key).first();
+    const count = row ? Number(row.count) : 0;
+    if (count >= limitPerHour) return false;
+    await env.DB.prepare(
+      "INSERT INTO auth_throttle (key, count, window_start) VALUES (?, 1, ?) " +
+      "ON CONFLICT(key) DO UPDATE SET count = count + 1"
+    ).bind(key, nowSec()).run();
+    return true;
+  } catch (e) {
+    return true;   // a broken counter must not lock everyone out
+  }
+}
+
+// ---------- signing in with a code ----------
+
+function sixDigits() {
+  const a = new Uint32Array(1);
+  crypto.getRandomValues(a);
+  return String(a[0] % 1000000).padStart(6, "0");
+}
+
+// POST /api/auth/code/request  { email, lang }
+async function handleCodeRequest(request, env) {
+  if (!hasDB(env)) return jsonError(503, "no_db");
+  const body = await readJson(request);
+  if (!body || !validEmail(body.email)) return jsonError(400, "invalid_email");
+  const email = body.email.trim().toLowerCase();
+  const lang = String((body.lang || "en")).slice(0, 5);
+
+  if (!(await throttle(env, request, "code", CODE_REQUESTS_PER_IP_HOUR))) {
+    return jsonError(429, "too_many_requests");
+  }
+
+  const t = nowSec();
+  const existing = await env.DB.prepare("SELECT * FROM login_codes WHERE email = ?").bind(email).first();
+  if (existing) {
+    if (t - Number(existing.last_sent) < CODE_RESEND_WAIT) {
+      return jsonError(429, "wait_before_resend");
+    }
+    // The hour is counted from the first send in the run, not from each one,
+    // so a patient attacker cannot walk the window forward indefinitely.
+    if (t - Number(existing.created_at) < 3600 && Number(existing.sent_count) >= CODE_SENDS_PER_HOUR) {
+      return jsonError(429, "too_many_requests");
+    }
+  }
+
+  const code = sixDigits();
+  const hash = await sha256Hex(email + "|" + code);
+  const fresh = !existing || (t - Number(existing.created_at) >= 3600);
+  await env.DB.prepare(
+    "INSERT INTO login_codes (email, code_hash, created_at, expires_at, attempts, sent_count, last_sent) " +
+    "VALUES (?, ?, ?, ?, 0, 1, ?) ON CONFLICT(email) DO UPDATE SET " +
+    "code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0, " +
+    "created_at = CASE WHEN ? THEN excluded.created_at ELSE login_codes.created_at END, " +
+    "sent_count = CASE WHEN ? THEN 1 ELSE login_codes.sent_count + 1 END, " +
+    "last_sent = excluded.last_sent"
+  ).bind(email, hash, t, t + CODE_TTL_SEC, t, fresh ? 1 : 0, fresh ? 1 : 0).run();
+
+  const mail = codeMailBody(code, lang);
+  const sent = await sendMail(env, email, mail.subject, mail.text, mail.html);
+  if (!sent.ok) {
+    // Nothing was delivered, so nothing should be left waiting to be guessed.
+    try { await env.DB.prepare("DELETE FROM login_codes WHERE email = ?").bind(email).run(); } catch (e) {}
+    return jsonError(503, sent.error === "email_not_configured" ? "email_not_configured" : "email_send_failed");
+  }
+
+  // Deliberately the same answer whether or not an account exists: this
+  // endpoint must not be a way to find out who is registered.
+  return jsonOk({ ok: true, sent: true, wait: CODE_RESEND_WAIT });
+}
+
+// POST /api/auth/code/verify  { email, code, name?, phone?, lang? }
+async function handleCodeVerify(request, env) {
+  if (!hasDB(env)) return jsonError(503, "no_db");
+  const body = await readJson(request);
+  if (!body || !validEmail(body.email) || typeof body.code !== "string") {
+    return jsonError(400, "invalid_code");
+  }
+  const email = body.email.trim().toLowerCase();
+  const code = body.code.replace(/\D/g, "");
+  const t = nowSec();
+
+  const row = await env.DB.prepare("SELECT * FROM login_codes WHERE email = ?").bind(email).first();
+  if (!row) return jsonError(400, "invalid_code");
+  if (Number(row.expires_at) <= t) {
+    try { await env.DB.prepare("DELETE FROM login_codes WHERE email = ?").bind(email).run(); } catch (e) {}
+    return jsonError(400, "code_expired");
+  }
+  if (Number(row.attempts) >= CODE_ATTEMPTS_MAX) {
+    try { await env.DB.prepare("DELETE FROM login_codes WHERE email = ?").bind(email).run(); } catch (e) {}
+    return jsonError(429, "too_many_attempts");
+  }
+
+  const hash = await sha256Hex(email + "|" + code);
+  if (!timingSafeEqual(hash, String(row.code_hash))) {
+    await env.DB.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE email = ?").bind(email).run();
+    return jsonError(400, "invalid_code");
+  }
+
+  // Right code. Burn it before doing anything else — a code that has been
+  // used once must not survive a later failure in this handler.
+  try { await env.DB.prepare("DELETE FROM login_codes WHERE email = ?").bind(email).run(); } catch (e) {}
+
+  const user = await upsertUserByEmail(env, {
+    email,
+    name: cleanName(body.name),
+    phone: normalisePhone(body.phone, body.lang),
+    emailVerified: true,
+  });
+  if (!user) return jsonError(500, "could_not_sign_in");
+
+  const token = await createSession(env, user.id);
+  return jsonOk(
+    { ok: true, email, name: user.display_name || null, needsPhone: !user.phone },
+    { "set-cookie": sessionCookie(token, SESSION_TTL_SEC) }
+  );
+}
+
+// Finds the account for a PROVEN address, or makes one. Never called with an
+// address the caller has not verified.
+async function upsertUserByEmail(env, d) {
+  try {
+    const found = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(d.email).first();
+    if (found) {
+      // Fill in only what is still empty: a returning person's own name and
+      // number are theirs to change in the cabinet, not ours to overwrite on
+      // every sign-in.
+      const sets = [], vals = [];
+      if (d.name && !found.display_name) { sets.push("display_name = ?"); vals.push(d.name); }
+      if (d.phone && !found.phone) { sets.push("phone = ?", "phone_at = ?"); vals.push(d.phone, nowSec()); }
+      if (d.emailVerified && !Number(found.email_verified)) { sets.push("email_verified = 1"); }
+      if (sets.length) {
+        vals.push(found.id);
+        await env.DB.prepare("UPDATE users SET " + sets.join(", ") + " WHERE id = ?").bind(...vals).run();
+        return await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(found.id).first();
+      }
+      return found;
+    }
+    const id = crypto.randomUUID();
+    const t = nowSec();
+    await env.DB.prepare(
+      "INSERT INTO users (id, email, display_name, phone, phone_at, email_verified, created_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).bind(id, d.email, d.name || null, d.phone || null, d.phone ? t : null, d.emailVerified ? 1 : 0, t).run();
+    return await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first();
+  } catch (e) {
+    return null;
+  }
+}
+
+// ---------- signing in with an external account ----------
+
+// GET /api/auth/<provider>/start
+function handleOAuthStart(request, env, name) {
+  const p = PROVIDERS[name];
+  if (!p) return jsonError(404, "unknown_provider");
+  if (!providerConfigured(env, name)) return jsonError(503, "provider_not_configured");
+
+  const url = new URL(request.url);
+  const state = randomToken(24);
+  const next = safeNext(url.searchParams.get("next"));
+
+  const authorize = new URL(p.authorize);
+  authorize.searchParams.set("client_id", env[p.idEnv]);
+  authorize.searchParams.set("redirect_uri", url.origin + "/api/auth/" + name + "/callback");
+  authorize.searchParams.set("response_type", "code");
+  authorize.searchParams.set("scope", p.scope);
+  authorize.searchParams.set("state", state);
+  // Ask for the account chooser rather than silently reusing whichever Google
+  // account the browser happens to be in: on a shared laptop that is how one
+  // person ends up inside another person's conversations.
+  authorize.searchParams.set("prompt", "select_account");
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: authorize.toString(),
+      "set-cookie": `${OAUTH_STATE_COOKIE}=${encodeURIComponent(state + "|" + next)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${OAUTH_STATE_TTL}`,
+      "cache-control": "no-store",
+    },
+  });
+}
+
+// Only ever send people back into our own site, and never to an address that
+// came from the query string unchecked — that is an open redirect.
+function safeNext(v) {
+  if (typeof v !== "string" || !v.startsWith("/") || v.startsWith("//")) return "/";
+  return v.slice(0, 200);
+}
+
+function backToSite(origin, next, error) {
+  const to = new URL(origin + (next || "/"));
+  if (error) to.searchParams.set("signin_error", error);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: to.toString(),
+      "set-cookie": `${OAUTH_STATE_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`,
+      "cache-control": "no-store",
+    },
+  });
+}
+
+// GET /api/auth/<provider>/callback?code=…&state=…
+async function handleOAuthCallback(request, env, name) {
+  const url = new URL(request.url);
+  const p = PROVIDERS[name];
+  if (!p) return jsonError(404, "unknown_provider");
+  if (!hasDB(env)) return backToSite(url.origin, "/", "no_db");
+  if (!providerConfigured(env, name)) return backToSite(url.origin, "/", "not_configured");
+
+  const raw = readCookie(request, OAUTH_STATE_COOKIE) || "";
+  const bar = raw.indexOf("|");
+  const wanted = bar >= 0 ? raw.slice(0, bar) : raw;
+  const next = safeNext(bar >= 0 ? raw.slice(bar + 1) : "/");
+  const got = url.searchParams.get("state") || "";
+  if (!wanted || !got || !timingSafeEqual(wanted, got)) {
+    return backToSite(url.origin, next, "state_mismatch");
+  }
+  if (url.searchParams.get("error")) return backToSite(url.origin, next, "declined");
+  const code = url.searchParams.get("code");
+  if (!code) return backToSite(url.origin, next, "no_code");
+
+  let claims;
+  try {
+    const body = new URLSearchParams({
+      code,
+      client_id: env[p.idEnv],
+      client_secret: env[p.secretEnv],
+      redirect_uri: url.origin + "/api/auth/" + name + "/callback",
+      grant_type: "authorization_code",
+    });
+    const r = await fetch(p.token, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    if (!r.ok) return backToSite(url.origin, next, "exchange_failed");
+    const tok = await r.json();
+    if (!tok || !tok.id_token) return backToSite(url.origin, next, "exchange_failed");
+    claims = await verifyIdToken(tok.id_token, p, env[p.idEnv]);
+  } catch (e) {
+    return backToSite(url.origin, next, "exchange_failed");
+  }
+  if (!claims || !claims.sub) return backToSite(url.origin, next, "bad_token");
+
+  const user = await linkOrCreate(env, name, claims);
+  if (!user) return backToSite(url.origin, next, "could_not_sign_in");
+
+  const token = await createSession(env, user.id);
+  const to = new URL(url.origin + next);
+  if (!user.phone) to.searchParams.set("need_phone", "1");
+  return new Response(null, {
+    status: 302,
+    headers: [
+      ["location", to.toString()],
+      ["set-cookie", sessionCookie(token, SESSION_TTL_SEC)],
+      ["set-cookie", `${OAUTH_STATE_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`],
+      ["cache-control", "no-store"],
+    ],
+  });
+}
+
+// The identity table is the join, not the email. The email is allowed to
+// attach a provider to an EXISTING account only when the provider says it has
+// verified it — that check is the whole defence against account takeover here.
+async function linkOrCreate(env, provider, claims) {
+  try {
+    const sub = String(claims.sub);
+    const linked = await env.DB.prepare(
+      "SELECT u.* FROM identities i JOIN users u ON u.id = i.user_id WHERE i.provider = ? AND i.provider_user_id = ?"
+    ).bind(provider, sub).first();
+    if (linked) return linked;
+
+    const verified = claims.email_verified === true || claims.email_verified === "true";
+    const email = verified && validEmail(claims.email) ? String(claims.email).trim().toLowerCase() : null;
+    if (!email) return null;
+
+    const user = await upsertUserByEmail(env, {
+      email,
+      name: cleanName(claims.name),
+      phone: null,
+      emailVerified: true,
+    });
+    if (!user) return null;
+
+    await env.DB.prepare(
+      "INSERT OR IGNORE INTO identities (provider, provider_user_id, user_id, email_at_link, created_at) " +
+      "VALUES (?, ?, ?, ?, ?)"
+    ).bind(provider, sub, user.id, email, nowSec()).run();
+    return user;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ---------- reading the provider's token ----------
+//
+// The token arrives over TLS straight from the provider's own endpoint, which
+// the OpenID specification accepts on its own. The signature is checked as
+// well, because this is the boundary of the whole account system and a later
+// refactor that starts accepting a token from somewhere else should not
+// quietly become a way in.
+
+let JWKS_CACHE = { url: "", at: 0, keys: null };
+
+async function jwksFor(p) {
+  const t = nowSec();
+  if (JWKS_CACHE.url === p.jwks && JWKS_CACHE.keys && t - JWKS_CACHE.at < 3600) return JWKS_CACHE.keys;
+  const r = await fetch(p.jwks);
+  if (!r.ok) return null;
+  const body = await r.json();
+  if (!body || !Array.isArray(body.keys)) return null;
+  JWKS_CACHE = { url: p.jwks, at: t, keys: body.keys };
+  return body.keys;
+}
+
+function b64urlToBytes(s) {
+  const pad = s.replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(pad + "=".repeat((4 - (pad.length % 4)) % 4));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+async function verifyIdToken(jwt, p, audience) {
+  const parts = String(jwt).split(".");
+  if (parts.length !== 3) return null;
+
+  let header, claims;
+  try {
+    header = JSON.parse(new TextDecoder().decode(b64urlToBytes(parts[0])));
+    claims = JSON.parse(new TextDecoder().decode(b64urlToBytes(parts[1])));
+  } catch (e) { return null; }
+  if (!header || header.alg !== "RS256") return null;
+
+  const keys = await jwksFor(p);
+  if (!keys) return null;
+  const jwk = keys.find((k) => k.kid === header.kid) || null;
+  if (!jwk) return null;
+
+  let ok = false;
+  try {
+    const key = await crypto.subtle.importKey(
+      "jwk",
+      { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", ext: true },
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    ok = await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5",
+      key,
+      b64urlToBytes(parts[2]),
+      new TextEncoder().encode(parts[0] + "." + parts[1])
+    );
+  } catch (e) { return null; }
+  if (!ok) return null;
+
+  const t = nowSec();
+  if (!p.issuers.includes(String(claims.iss))) return null;
+  if (String(claims.aud) !== String(audience)) return null;
+  if (!claims.exp || Number(claims.exp) <= t - 60) return null;      // a minute of clock slack
+  if (claims.iat && Number(claims.iat) > t + 300) return null;
+  return claims;
+}
+
+// ---------- the telephone, asked for once ----------
+
+// POST /api/account/phone  { phone, lang }
+async function handleSetPhone(request, env) {
+  if (!hasDB(env)) return jsonError(503, "no_db");
+  const user = await currentUser(request, env);
+  if (!user) return jsonError(401, "sign_in_required");
+  const body = await readJson(request);
+  const phone = normalisePhone(body && body.phone, body && body.lang);
+  if (!phone) return jsonError(400, "invalid_phone");
+  try {
+    await env.DB.prepare("UPDATE users SET phone = ?, phone_at = ? WHERE id = ?")
+      .bind(phone, nowSec(), user.id).run();
+  } catch (e) {
+    return jsonError(500, "could_not_save");
+  }
+  return jsonOk({ ok: true, phone });
+}
+
+// GET /api/auth/ways — what the sign-in sheet should draw, and whether a code
+// can actually be sent. The browser has to know this: a Google button that
+// leads to "not configured" is worse than no button.
+function handleWaysIn(env) {
+  return jsonOk({
+    providers: waysIn(env),
+    email: !!env.RESEND_API_KEY,
+    password: true,
+  });
+}
 
 // ---------- memory ----------
 //
@@ -3093,9 +3700,38 @@ async function handleLogout(request, env) {
   return jsonOk({ ok: true }, { "set-cookie": sessionCookie("", 0) });
 }
 
+// Sessions renew themselves while they are in use (v70). Before this, the
+// cookie was set once for thirty days and never touched again, so a client
+// who used Alla every day was still thrown out on the thirty-first — which
+// looks to them like the memory failing, not like a session expiring. Now
+// every visit pushes the date out, and only once a day, so an active account
+// costs one database write per device per day rather than one per request.
+const SESSION_RENEW_AFTER = 86400;
+
+async function touchSession(request, env) {
+  try {
+    const token = readCookie(request, SESSION_COOKIE);
+    if (!token) return null;
+    const hash = await sha256Hex(token);
+    const row = await env.DB.prepare(
+      "SELECT expires_at FROM sessions WHERE token_hash = ?"
+    ).bind(hash).first();
+    if (!row) return null;
+    const t = nowSec();
+    const fresh = Number(row.expires_at) - t;
+    if (fresh > SESSION_TTL_SEC - SESSION_RENEW_AFTER) return null;   // renewed recently
+    await env.DB.prepare("UPDATE sessions SET expires_at = ? WHERE token_hash = ?")
+      .bind(t + SESSION_TTL_SEC, hash).run();
+    return sessionCookie(token, SESSION_TTL_SEC);
+  } catch (e) {
+    return null;   // a session that fails to renew still works until it expires
+  }
+}
+
 async function handleAccount(request, env, cfg) {
   const user = await currentUser(request, env);
   if (!user) return jsonOk({ signedIn: false, billingEnabled: cfg.billingEnabled });
+  const renewed = await touchSession(request, env);
   const sub = await env.DB.prepare("SELECT * FROM subscriptions WHERE user_id = ?").bind(user.id).first();
   const since = sub && sub.current_period_start ? sub.current_period_start : (nowSec() - 30 * 86400);
   const spent = await usageSince(env, user.id, since);
@@ -3105,6 +3741,8 @@ async function handleAccount(request, env, cfg) {
     signedIn: true,
     email: user.email,
     name: user.display_name || null,
+    phone: user.phone || null,
+    needsPhone: !user.phone,
     billingEnabled: cfg.billingEnabled,
     plan,
     status: sub ? sub.status : null,
@@ -3118,7 +3756,7 @@ async function handleAccount(request, env, cfg) {
       days: cfg.trialDays,
       startedAt: user.trial_started_at
     }
-  });
+  }, renewed ? { "set-cookie": renewed } : undefined);
 }
 
 async function handleCheckout(request, env, cfg, url) {
@@ -3263,8 +3901,26 @@ async function routeBilling(request, env, url, cfg) {
   if (p === "/api/auth/signup" && post) return handleSignup(request, env);
   if (p === "/api/auth/login" && post) return handleLogin(request, env);
   if (p === "/api/auth/logout" && post) return handleLogout(request, env);
+
+  // The ways in (v70). The sheet asks first what doors exist, because a
+  // Google button that leads to "not configured" is worse than no button.
+  if (p === "/api/auth/ways" && request.method === "GET") return handleWaysIn(env);
+  if (p === "/api/auth/code/request" && post) return handleCodeRequest(request, env);
+  if (p === "/api/auth/code/verify" && post) return handleCodeVerify(request, env);
+  {
+    // /api/auth/<provider>/start and /callback — one shape for every provider,
+    // so Apple and Google Play are a row in PROVIDERS, not a new branch here.
+    const m = /^\/api\/auth\/([a-z_]+)\/(start|callback)$/.exec(p);
+    if (m && request.method === "GET") {
+      return m[2] === "start"
+        ? handleOAuthStart(request, env, m[1])
+        : handleOAuthCallback(request, env, m[1]);
+    }
+  }
+
   if (p === "/api/account" && request.method === "GET") return handleAccount(request, env, cfg);
   if (p === "/api/account/name" && post) return handleSetName(request, env);
+  if (p === "/api/account/phone" && post) return handleSetPhone(request, env);
   // Articles 15, 16 and 17: see it, correct it, erase it.
   if (p === "/api/account/data" && request.method === "GET") return handleExportData(request, env);
   if (p === "/api/account/profile") return handleClientProfile(request, env);
