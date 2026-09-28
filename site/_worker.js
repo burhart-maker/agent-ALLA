@@ -1601,12 +1601,18 @@ async function sendMail(env, to, subject, text, html) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        // Sent from no-reply so the letter reads as automatic, but answerable:
-        // people do reply to a sign-in code, and the reply is often the hottest
-        // question they will ever ask — "how much is this?", "do you cover
-        // Menorca?". Reply-To catches it in a mailbox that a person reads,
-        // instead of bouncing it off an address that does not exist.
-        from: env.MAIL_FROM || "Agent AllA <no-reply@agentalla.com>",
+        // Deliberately not no-reply. Mailbox providers score a sender that
+        // cannot be written to lower, and people do reply to a sign-in code —
+        // often with the hottest question they will ever ask ("how much is
+        // this?", "do you cover Menorca?"). So the letter comes from a real
+        // name, and Reply-To puts the answer in hola@, a mailbox a person
+        // reads, rather than bouncing it off an address that does not exist.
+        //
+        // The sending subdomain is deliberate as well: if a run of bounces or
+        // spam complaints ever damages a reputation, it should be
+        // mail.agentalla.com paying for it, never the root domain that
+        // carries the company's ordinary correspondence.
+        from: env.MAIL_FROM || "Agent AllA <hola@mail.agentalla.com>",
         reply_to: [env.MAIL_REPLY_TO || "hola@agentalla.com"],
         to: [to],
         subject,
