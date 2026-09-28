@@ -1601,7 +1601,13 @@ async function sendMail(env, to, subject, text, html) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        from: env.MAIL_FROM || "Agent Alla <hola@agentalla.com>",
+        // Sent from no-reply so the letter reads as automatic, but answerable:
+        // people do reply to a sign-in code, and the reply is often the hottest
+        // question they will ever ask — "how much is this?", "do you cover
+        // Menorca?". Reply-To catches it in a mailbox that a person reads,
+        // instead of bouncing it off an address that does not exist.
+        from: env.MAIL_FROM || "Agent AllA <no-reply@agentalla.com>",
+        reply_to: [env.MAIL_REPLY_TO || "hola@agentalla.com"],
         to: [to],
         subject,
         text,
