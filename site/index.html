@@ -5096,7 +5096,7 @@
   // ---------- attaching documents ----------
   //
   // The agency's real work arrives as a file: a nota simple, an informe
-  // urbanístico, a cadastral extract. Anthropic reads PDFs and images itself,
+  // urbanístico, a cadastral extract. The AI provider reads PDFs and images itself,
   // so this only has to collect the bytes, show what is attached, and hand it
   // to send(). Limits mirror the server's, so a refusal is explained here
   // rather than after a pointless upload.
@@ -5536,7 +5536,7 @@
     }
   }
 
-  // Parses an Anthropic Messages API SSE stream (as proxied verbatim by
+  // Parses the application SSE stream (normalized by
   // /api/chat) into plain text deltas.
   async function streamChat(turns, onDelta, attachments) {
     var payloadBody = { messages: turns };
