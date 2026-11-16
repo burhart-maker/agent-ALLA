@@ -4270,6 +4270,8 @@
       micListening: 'Listening… click to stop',
       micErrorPermission: "Alla couldn't access your microphone — check your browser's permission for this site.",
       micErrorGeneric: "Voice input didn't work — try typing instead.",
+      micErrorRecording: "The browser could not record audio. Check the microphone and try opening the site in Chrome or Safari.",
+      micErrorNetwork: "Could not send the recording. Check your connection and try again.",
       micTranscribing: 'Recognising your speech…',
       micErrorNoDevice: 'No microphone found — connect one, or type your question instead.',
       micErrorUnsupported: 'This browser can\'t record audio — try typing instead.',
@@ -4352,6 +4354,8 @@
       micListening: 'Escuchando… haz clic para detener',
       micErrorPermission: 'Alla no pudo acceder a tu micrófono — revisa el permiso del navegador para este sitio.',
       micErrorGeneric: 'La entrada de voz no funcionó — prueba escribiendo.',
+      micErrorRecording: "El navegador no pudo grabar audio. Revisa el micrófono y prueba abrir el sitio en Chrome o Safari.",
+      micErrorNetwork: "No se pudo enviar la grabación. Revisa la conexión e inténtalo de nuevo.",
       micTranscribing: 'Reconociendo tu voz…',
       micErrorNoDevice: 'No se encontró ningún micrófono — conecta uno o escribe tu pregunta.',
       micErrorUnsupported: 'Este navegador no puede grabar audio — prueba escribiendo.',
@@ -4434,6 +4438,8 @@
       micListening: 'Слушаю… нажмите, чтобы остановить',
       micErrorPermission: 'Алла не смогла получить доступ к микрофону — проверьте разрешение браузера для этого сайта.',
       micErrorGeneric: 'Голосовой ввод не сработал — попробуйте напечатать сообщение.',
+      micErrorRecording: "Браузер не смог записать звук. Проверьте микрофон и попробуйте открыть сайт в Chrome или Safari.",
+      micErrorNetwork: "Не удалось отправить запись. Проверьте подключение и попробуйте ещё раз.",
       micTranscribing: 'Распознаю речь…',
       micErrorNoDevice: 'Микрофон не найден — подключите его или напечатайте вопрос.',
       micErrorUnsupported: 'Этот браузер не умеет записывать звук — попробуйте напечатать сообщение.',
@@ -4516,6 +4522,8 @@
       micListening: 'Hört zu… zum Stoppen klicken',
       micErrorPermission: 'Alla konnte nicht auf Ihr Mikrofon zugreifen — prüfen Sie die Browser-Berechtigung für diese Seite.',
       micErrorGeneric: 'Die Spracheingabe hat nicht funktioniert — versuchen Sie es mit Tippen.',
+      micErrorRecording: "Der Browser konnte keinen Ton aufnehmen. Prüfe das Mikrofon und öffne die Website in Chrome oder Safari.",
+      micErrorNetwork: "Die Aufnahme konnte nicht gesendet werden. Prüfe die Verbindung und versuche es erneut.",
       micTranscribing: 'Spracherkennung läuft…',
       micErrorNoDevice: 'Kein Mikrofon gefunden — schließen Sie eins an oder tippen Sie Ihre Frage.',
       micErrorUnsupported: 'Dieser Browser kann kein Audio aufnehmen — bitte tippen Sie stattdessen.',
@@ -4598,6 +4606,8 @@
       micListening: 'Écoute en cours… cliquez pour arrêter',
       micErrorPermission: "Alla n'a pas pu accéder à votre microphone — vérifiez l'autorisation du navigateur pour ce site.",
       micErrorGeneric: "La saisie vocale n'a pas fonctionné — essayez de taper votre message.",
+      micErrorRecording: "Le navigateur n’a pas pu enregistrer le son. Vérifiez le microphone et ouvrez le site dans Chrome ou Safari.",
+      micErrorNetwork: "L’enregistrement n’a pas pu être envoyé. Vérifiez la connexion et réessayez.",
       micTranscribing: 'Reconnaissance de la parole…',
       micErrorNoDevice: 'Aucun micro détecté — branchez-en un ou écrivez votre question.',
       micErrorUnsupported: 'Ce navigateur ne peut pas enregistrer l\'audio — essayez d\'écrire.',
@@ -4680,6 +4690,8 @@
       micListening: 'A ouvir… clique para parar',
       micErrorPermission: 'A Alla não conseguiu aceder ao seu microfone — verifique a permissão do navegador para este site.',
       micErrorGeneric: 'A entrada de voz não funcionou — tente escrever.',
+      micErrorRecording: "O navegador não conseguiu gravar áudio. Verifique o microfone e abra o site no Chrome ou Safari.",
+      micErrorNetwork: "Não foi possível enviar a gravação. Verifique a ligação e tente novamente.",
       micTranscribing: 'A reconhecer a sua voz…',
       micErrorNoDevice: 'Nenhum microfone encontrado — ligue um ou escreva a sua pergunta.',
       micErrorUnsupported: 'Este navegador não consegue gravar áudio — tente escrever.',
@@ -4762,6 +4774,8 @@
       micListening: 'In ascolto… clicca per fermare',
       micErrorPermission: 'Alla non è riuscita ad accedere al tuo microfono — controlla il permesso del browser per questo sito.',
       micErrorGeneric: "L'input vocale non ha funzionato — prova a scrivere.",
+      micErrorRecording: "Il browser non è riuscito a registrare l’audio. Controlla il microfono e apri il sito in Chrome o Safari.",
+      micErrorNetwork: "Non è stato possibile inviare la registrazione. Controlla la connessione e riprova.",
       micTranscribing: 'Riconoscimento vocale in corso…',
       micErrorNoDevice: 'Nessun microfono trovato — collegane uno o scrivi la tua domanda.',
       micErrorUnsupported: 'Questo browser non può registrare audio — prova a scrivere.',
@@ -5310,7 +5324,7 @@
     var chunks = [];
     var startedAt = 0;
     var stopTimer = null;
-    var state = "idle";           // idle | starting | recording | sending
+    var state = "idle";           // idle | starting | recording | stopping | sending
     var discard = false;
 
     function setState(next) {
@@ -5320,11 +5334,11 @@
       micBtn.classList.toggle("mic-active", next === "recording");
       micBtn.classList.toggle("mic-busy", next === "sending");
       var label = next === "recording" ? T.micListening
-                : next === "sending"   ? T.micTranscribing
+                : (next === "sending" || next === "stopping") ? T.micTranscribing
                 : T.micLabel;
       micBtn.setAttribute("aria-label", label);
       micBtn.title = label;
-      micBtn.disabled = next === "sending" || next === "starting";
+      micBtn.disabled = next !== "idle" && next !== "recording";
       micBtn.setAttribute("aria-pressed", String(next === "recording"));
     }
 
@@ -5366,7 +5380,7 @@
         var name = (e && e.name) || "";
         var msg = (name === "NotAllowedError" || name === "SecurityError") ? T.micErrorPermission
                 : (name === "NotFoundError" || name === "OverconstrainedError") ? T.micErrorNoDevice
-                : T.micErrorGeneric;
+                : T.micErrorRecording;
         addMessage("system", msg);
         reset();
         return;
@@ -5382,9 +5396,16 @@
       }
 
       chunks = [];
-      recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
-      recorder.onerror = function () { discard = true; addMessage("system", T.micErrorGeneric); };
-      recorder.onstop = function () { onStopped(); };
+      var activeRecorder = recorder;
+      recorder.ondataavailable = function (e) { if (recorder === activeRecorder && e.data && e.data.size) chunks.push(e.data); };
+      recorder.onerror = function (e) {
+        if (recorder !== activeRecorder) return;
+        discard = true;
+        try { console.warn("[alla] voice recording", e && e.error && e.error.name || "recording_failed"); } catch (_) {}
+        addMessage("system", T.micErrorRecording);
+        reset();
+      };
+      recorder.onstop = function () { if (recorder === activeRecorder) onStopped(); };
 
       startedAt = Date.now();
       try { recorder.start(); } catch (e) {
@@ -5401,7 +5422,8 @@
 
     function stop() {
       if (state !== "recording") return;
-      try { recorder.stop(); } catch (e) { reset(); }
+      setState("stopping");
+      try { recorder.stop(); } catch (e) { addMessage("system", T.micErrorRecording); reset(); }
     }
 
     async function onStopped() {
@@ -5431,8 +5453,11 @@
       var type = (blob.type || "audio/webm").split(";")[0];
 
       var text = "";
+      var uploadAbort = new AbortController();
+      var uploadTimer = setTimeout(function () { uploadAbort.abort(); }, 60000);
       try {
         var res = await fetch("/api/transcribe", {
+          signal: uploadAbort.signal,
           method: "POST",
           headers: { "content-type": type, "x-audio-seconds": String(seconds) },
           body: blob
@@ -5445,25 +5470,26 @@
           // turned into a cause in one glance at the console, from any device.
           try { console.warn("[alla] transcribe", res.status, JSON.stringify(body)); } catch (e) {}
           addMessage("system",
+            code === "sign_in_required" || code === "trial_over" || code === "allowance_exceeded" ? errorCopy(res.status, code) :
+            code === "audio_empty" ? T.micErrorNoSpeech :
             code === "transcribe_rate_limited" ? T.micErrorRateLimited :
             code === "audio_too_long" || code === "audio_too_large" ? T.micErrorTooLong :
             code === "audio_type_unsupported" ? T.micErrorUnsupported :
             // Everything left is the service, not the person: no key, no
             // credit, OpenAI down. Saying "try typing" and nothing else sent
             // him hunting through browser permissions for an hour.
-            code === "transcribe_failed" || code === "transcribe_exception" ||
-            code === "transcribe_not_configured" ? T.micErrorService :
-            T.micErrorGeneric);
+            T.micErrorService);
           reset();
           return;
         }
         var data = await res.json();
         text = (data && data.text ? String(data.text) : "").trim();
       } catch (e) {
-        addMessage("system", T.micErrorGeneric);
+        try { console.warn("[alla] voice upload", e && e.name || "upload_failed"); } catch (_) {}
+        addMessage("system", T.micErrorNetwork);
         reset();
         return;
-      }
+      } finally { clearTimeout(uploadTimer); }
 
       reset();
 

@@ -14,7 +14,7 @@ const voice = section('(function setupVoiceInput()', '\n  function addMessage');
 const send = section('  async function send()', '\n  // Opening state');
 const update = section('  function updateSendState()', '\n  inputEl.placeholder');
 
-function harness() {
+function harness(options = {}) {
   function element() {
     return { value: '', disabled: false, style: {}, attrs: {}, handlers: {},
       classList: { toggle() {}, remove() {} },
@@ -38,24 +38,25 @@ function harness() {
   }
   const ctx = vm.createContext({
     micBtn, sendBtn, inputEl, busy: false, voiceBusy: false, attachmentReading: false,
-    Blob, MediaRecorder: Recorder, Date: { now: () => clock }, console,
+    Blob, AbortController, MediaRecorder: Recorder, Date: { now: () => clock }, console,
     navigator: { mediaDevices: { async getUserMedia() { return { getTracks: () => [{ stop() { stoppedTracks++; } }] }; } } },
     document: { addEventListener() {}, hidden: false },
     window: { MediaRecorder: Recorder,
       __allaHasAttachments: () => files.length > 0,
       __allaTakeAttachments() { const result = files; files = []; return result; } },
-    T: { micLabel: 'Record', micListening: 'Stop recording', micTranscribing: 'Transcribing', micErrorNoSpeech: 'No speech' },
+    T: { micLabel: 'Record', micListening: 'Stop recording', micTranscribing: 'Transcribing', micErrorNoSpeech: 'No speech', micErrorService: 'Service unavailable', micErrorRecording: 'Recording failed', micErrorNetwork: 'Network failed' },
     setTimeout() { return 1; }, clearTimeout() {},
     setInterval() { throw new Error('Dictation must not schedule automatic sending'); },
     async fetch(url) {
       assert.equal(url, '/api/transcribe'); transcriptions++;
       await new Promise(resolve => { transcriptResolve = resolve; });
-      return { ok: true, json: async () => ({ text: 'Recognized draft' }) };
+      if (options.networkError) throw new TypeError('fetch failed');
+      return { ok: !options.status, status: options.status || 200, json: async () => options.status ? { error: options.code } : { text: 'Recognized draft' } };
     },
     autoGrow() { ctx.updateSendState(); },
     addMessage(role, text) { messages.push({ role, text }); return element(); },
     history: [], MAX_TURNS: 20, scrollEl: { scrollTop: 0, scrollHeight: 0 },
-    errorCopy() { return 'error'; },
+    errorCopy(status, code) { return code || 'error'; },
     async streamChat(history, delta, attachments) { sent.push({ text: history.at(-1).content, attachments }); return 'OK'; }
   });
   vm.runInContext(update + voice + send, ctx);
@@ -64,7 +65,7 @@ function harness() {
     async start() { await micBtn.handlers.click(); await Promise.resolve(); await Promise.resolve(); },
     async stop() { clock += 1000; micBtn.handlers.click(); await Promise.resolve(); },
     async finish() { transcriptResolve(); for (let i = 0; i < 12; i++) await Promise.resolve(); },
-    tracksStopped: () => stoppedTracks, transcriptions: () => transcriptions };
+    getRecorder: () => recorder, tracksStopped: () => stoppedTracks, transcriptions: () => transcriptions };
 }
 
 test('record → stop → editable draft → explicit send, with attachment and edits', async () => {
@@ -136,4 +137,39 @@ test('IME Enter does not send; ordinary Enter sends; Shift+Enter stays a draft',
   h.inputEl.handlers.keydown(enter);
   await Promise.resolve();
   assert.equal(h.sent.length, 1);
+});
+
+for (const [status, code] of [[401, 'sign_in_required'], [402, 'trial_over'], [402, 'allowance_exceeded']]) {
+  test(`voice explains ${code} without blaming microphone`, async () => {
+    const h = harness({ status, code });
+    await h.start(); await h.stop(); await h.finish();
+    assert.equal(h.messages.at(-1).text, code);
+    assert.equal(h.micBtn.disabled, false);
+    assert.equal(h.sent.length, 0);
+  });
+}
+
+test('voice network failure resets controls and preserves typed draft', async () => {
+  const h = harness({ networkError: true }); h.inputEl.value = 'Keep this';
+  await h.start(); await h.stop(); await h.finish();
+  assert.equal(h.messages.at(-1).text, 'Network failed');
+  assert.equal(h.inputEl.value, 'Keep this');
+  assert.equal(h.sendBtn.disabled, false);
+});
+
+test('recorder errors release microphone; late stop cannot reset new recording', async () => {
+  const h = harness(); await h.start();
+  const old = h.getRecorder(); old.onerror({ error: { name: 'NotReadableError' } });
+  assert.equal(h.tracksStopped(), 1);
+  assert.equal(h.messages.at(-1).text, 'Recording failed');
+  await h.start(); old.onstop();
+  assert.equal(h.micBtn.attrs['aria-pressed'], 'true');
+  assert.equal(h.tracksStopped(), 1);
+});
+
+test('repeated stop does not discard the recording while stopping', async () => {
+  const h = harness(); await h.start();
+  await h.stop(); await h.stop(); await h.finish();
+  assert.equal(h.transcriptions(), 1);
+  assert.equal(h.inputEl.value, 'Recognized draft');
 });
