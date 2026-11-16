@@ -5525,7 +5525,20 @@
   }
   inputEl.addEventListener("input", autoGrow);
 
-  function errorCopy(status) {
+  function errorCopy(status, detail) {
+    var limits = {
+      en: ['Please sign in to continue chatting.', 'Your free trial has ended. Please open your account to review access.', 'You have reached your plan allowance. Please open your account.'],
+      es: ['Inicia sesión para seguir conversando.', 'Tu prueba gratuita ha terminado. Abre tu cuenta para revisar el acceso.', 'Has alcanzado el límite de tu plan. Abre tu cuenta.'],
+      ru: ['Войдите в аккаунт, чтобы продолжить разговор.', 'Пробный период закончился. Откройте аккаунт, чтобы проверить доступ.', 'Лимит вашего тарифа исчерпан. Откройте аккаунт.'],
+      de: ['Bitte melde dich an, um weiterzuschreiben.', 'Deine kostenlose Testphase ist beendet. Bitte öffne dein Konto, um den Zugang zu prüfen.', 'Du hast dein Tariflimit erreicht. Bitte öffne dein Konto.'],
+      fr: ['Connectez-vous pour continuer la conversation.', 'Votre période d’essai est terminée. Ouvrez votre compte pour vérifier votre accès.', 'Vous avez atteint la limite de votre forfait. Ouvrez votre compte.'],
+      pt: ['Entre na sua conta para continuar a conversa.', 'O seu período de teste terminou. Abra a sua conta para verificar o acesso.', 'Atingiu o limite do seu plano. Abra a sua conta.'],
+      it: ['Accedi per continuare la conversazione.', 'Il periodo di prova è terminato. Apri il tuo account per verificare l’accesso.', 'Hai raggiunto il limite del piano. Apri il tuo account.']
+    };
+    var copy = limits[LANG] || limits.en;
+    if (detail === 'sign_in_required') return copy[0];
+    if (detail === 'trial_over') return copy[1];
+    if (detail === 'allowance_exceeded') return copy[2];
     switch (status) {
       case 429:
         return T.errorRate;
@@ -5661,7 +5674,7 @@
         d === "file_too_large" || d === "files_too_large" ? (T.attachTooBig || "").replace("{n}", "8") :
         d === "too_many_files" ? T.attachTooMany :
         d === "file_type_unsupported" ? T.attachBadType :
-        errorCopy(e && e.status));
+        errorCopy(e && e.status, e && e.detail));
     } finally {
       busy = false;
       updateSendState();

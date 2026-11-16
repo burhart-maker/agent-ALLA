@@ -55,7 +55,7 @@ test('streamed Cyrillic survives fragmented bytes; contract and usage retained',
 test('function results and reasoning retained for second round; no duplicate invocation', async () => {
   const output = [{ type: 'reasoning', encrypted_content: 'encrypted' }, { type: 'function_call', name: 'catastro_lookup', call_id: 'call-1', arguments: '{"municipio":"Mahon"}' }];
   const h = harness([wire([complete(output, 5)]), wire([{ type: 'response.output_text.delta', delta: 'Verified' }, complete([], 6)])]);
-  const r = await h.api.aiChat(request(), env, [{ role: 'user', content: 'parcel' }], 'sys', [], {});
+  const r = await h.api.aiChat(request(), env, [{ role: 'user', content: 'parcel' }], 'sys', [h.api.aiFunction(h.api.CATASTRO_TOOL)], {});
   const text = await r.text();
   assert.equal(h.tools.length, 1); assert.equal(h.requests.length, 2);
   assert.equal(h.requests[1].body.input[1].encrypted_content, 'encrypted');
@@ -67,7 +67,7 @@ test('function results and reasoning retained for second round; no duplicate inv
 test('tool error becomes evidence of failure instead of fabricated facts', async () => {
   const h = harness([wire([complete([{ type: 'function_call', name: 'catastro_lookup', call_id: 'c', arguments: '{}' }])]), wire([complete()])]);
   h.c.runCatastroTool = async () => { throw new Error('offline'); };
-  await (await h.api.aiChat(request(), env, [], 'sys', [], {})).text();
+  await (await h.api.aiChat(request(), env, [], 'sys', [h.api.aiFunction(h.api.CATASTRO_TOOL)], {})).text();
   assert.match(h.requests[1].body.input.at(-1).output, /tool_failed/);
 });
 
@@ -89,7 +89,7 @@ test('interrupted stream produces error, no successful completion or profile tex
 
 test('tool round cap refuses rather than losing gathered results', async () => {
   const h = harness(Array.from({ length: 4 }, () => wire([complete([{ type: 'function_call', name: 'catastro_lookup', call_id: 'c', arguments: '{}' }])])));
-  const text = await (await h.api.aiChat(request(), env, [], '', [], {})).text();
+  const text = await (await h.api.aiChat(request(), env, [], '', [h.api.aiFunction(h.api.CATASTRO_TOOL)], {})).text();
   assert.equal(h.requests.length, 4); assert.equal(h.tools.length, 3);
   assert.match(text, /"type":"error"/);
 });
@@ -126,4 +126,11 @@ test('function schemas preserved, model override and verified fallback pricing',
   const cost = await h.api.eurMicrosFor({}, { usdToEur: 1, searchUsd: 0 }, 'gpt-6-astra', 1000000, 1000000, 0, 0);
   assert.equal(cost, 60000000);
   assert.doesNotMatch(source, /api\.anthropic\.com|env\.ANTHROPIC_API_KEY/);
+});
+
+test('model cannot execute a function that was not offered for this turn', async () => {
+  const h = harness([wire([complete([{ type: 'function_call', name: 'property_report', call_id: 'c', arguments: '{}' }])]), wire([complete()])]);
+  await (await h.api.aiChat(request(), env, [], '', [], {})).text();
+  assert.equal(h.tools.length, 0);
+  assert.match(h.requests[1].body.input.at(-1).output, /tool_not_offered/);
 });

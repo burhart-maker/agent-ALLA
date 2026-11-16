@@ -861,7 +861,8 @@ async function aiChat(request, env, input, instructions, tools, actor) {
             let result;
             try {
               const args = JSON.parse(call.arguments);
-              if (call.name === "catastro_lookup") result = await runCatastroTool(args);
+              if (!tools.some(t => t.type === "function" && t.name === call.name)) result = { error: "tool_not_offered" };
+              else if (call.name === "catastro_lookup") result = await runCatastroTool(args);
               else if (call.name === "property_report") result = await runReportTool(args, env, request, actor);
               else result = { error: "unknown_tool" };
             } catch (e) { result = { error: "tool_failed", message: "The requested tool could not complete. Do not invent its result." }; }
